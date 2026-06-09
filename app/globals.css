@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #FF192F;
+  --color-secondary: #022E7A;
+  --color-accent: #F8805C;
+  --color-yellow: #EEE56E;
+  --color-pink: #D20772;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+}
