@@ -1,24 +1,22 @@
 'use client';
 
 import { useMemo } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
-  BarChart3,
   ClipboardList,
   FileSpreadsheet,
   LayoutDashboard,
-  LogOut,
   Menu,
   PackageCheck,
   ShieldCheck,
   Store,
   Users,
+  UserCheck,
   Warehouse,
   Download,
 } from 'lucide-react';
 import UserAccountMenu from '@/components/UserAccountMenu';
 import AuthGuard from '@/components/AuthGuard';
-import { clearSession, getUser } from '@/lib/auth';
 
 const NAV_ADMIN = [
   {
@@ -45,6 +43,11 @@ const NAV_ADMIN = [
     label: 'Surtidores',
     href: '/admin/surtidores',
     icon: Warehouse
+  },
+  {
+    label: 'Checadores',
+    href: '/admin/checadores',
+    icon: UserCheck
   },
   {
     label: 'Sucursales',
@@ -85,6 +88,11 @@ const NAV_SUPERVISOR = [
     icon: Warehouse
   },
   {
+    label: 'Checadores',
+    href: '/supervisor/checadores',
+    icon: UserCheck
+  },
+  {
     label: 'Exportaciones',
     href: '/supervisor/exportaciones',
     icon: Download
@@ -121,17 +129,9 @@ function SidebarItem({ item, active }) {
 
 function AdminShellContent({ children, title, subtitle, role }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const user = getUser();
-
   const navItems = useMemo(() => {
     return role === 'ADMIN' ? NAV_ADMIN : NAV_SUPERVISOR;
   }, [role]);
-
-  function handleLogout() {
-    clearSession();
-    router.replace('/login');
-  }
 
   return (
     <div className="min-h-screen bg-[#f3f6fb]">
