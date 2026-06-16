@@ -5,11 +5,13 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
+  Clock3,
   Download,
   FileSpreadsheet,
   Loader2,
   RefreshCcw,
   Store,
+  Users,
   Warehouse
 } from 'lucide-react';
 
@@ -18,6 +20,7 @@ import ReportPanel from './ReportPanel';
 
 import { exportacionesApi } from '@/lib/exportacionesApi';
 import { sucursalesApi, surtidoresApi } from '@/lib/productividadApi';
+import { checadoresApi } from '@/lib/checadoresApi';
 
 function todayLocal() {
   const date = new Date();
@@ -26,6 +29,14 @@ function todayLocal() {
   const day = String(date.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+function monthStartLocal() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+
+  return `${year}-${month}-01`;
 }
 
 function addDays(dateString, days) {
@@ -100,7 +111,8 @@ function ExportButton({
   const variants = {
     dark: 'bg-slate-950 text-white hover:bg-slate-800',
     red: 'bg-[var(--color-primary)] text-white hover:brightness-95',
-    white: 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50'
+    white: 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50',
+    blue: 'bg-blue-950 text-white hover:bg-blue-900'
   };
 
   return (
@@ -138,6 +150,7 @@ function FiltrosExportacion({
   setFiltros,
   sucursales,
   surtidores,
+  checadores,
   onReset
 }) {
   function setValue(key, value) {
@@ -150,7 +163,7 @@ function FiltrosExportacion({
   return (
     <ReportPanel
       title="Filtros de exportación"
-      subtitle="Estos filtros aplican a las descargas de reportes."
+      subtitle="Fecha diaria aplica a dashboard, métricas y comparativos. Desde/hasta aplica a históricos, reporte grupal y checadores."
       right={
         <button
           type="button"
@@ -163,66 +176,37 @@ function FiltrosExportacion({
       }
     >
       <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DateField
-          label="Fecha diaria"
-          value={filtros.fecha}
-          onChange={(e) => setValue('fecha', e.target.value)}
-        />
+        <DateField label="Fecha diaria" value={filtros.fecha} onChange={(e) => setValue('fecha', e.target.value)} />
+        <DateField label="Desde" value={filtros.desde} onChange={(e) => setValue('desde', e.target.value)} />
+        <DateField label="Hasta" value={filtros.hasta} onChange={(e) => setValue('hasta', e.target.value)} />
 
-        <DateField
-          label="Desde"
-          value={filtros.desde}
-          onChange={(e) => setValue('desde', e.target.value)}
-        />
-
-        <DateField
-          label="Hasta"
-          value={filtros.hasta}
-          onChange={(e) => setValue('hasta', e.target.value)}
-        />
-
-        <SelectField
-          label="Formato"
-          value={filtros.formato}
-          onChange={(e) => setValue('formato', e.target.value)}
-        >
+        <SelectField label="Formato" value={filtros.formato} onChange={(e) => setValue('formato', e.target.value)}>
           <option value="xlsx">Excel .xlsx</option>
           <option value="csv">CSV</option>
         </SelectField>
 
-        <SelectField
-          label="Sucursal"
-          value={filtros.sucursal_id}
-          onChange={(e) => setValue('sucursal_id', e.target.value)}
-        >
+        <SelectField label="Sucursal" value={filtros.sucursal_id} onChange={(e) => setValue('sucursal_id', e.target.value)}>
           <option value="">Todas las sucursales</option>
-
           {sucursales.map((sucursal) => (
-            <option key={sucursal.id} value={sucursal.id}>
-              {sucursal.nombre}
-            </option>
+            <option key={sucursal.id} value={sucursal.id}>{sucursal.nombre}</option>
           ))}
         </SelectField>
 
-        <SelectField
-          label="Surtidor"
-          value={filtros.surtidor_id}
-          onChange={(e) => setValue('surtidor_id', e.target.value)}
-        >
+        <SelectField label="Surtidor" value={filtros.surtidor_id} onChange={(e) => setValue('surtidor_id', e.target.value)}>
           <option value="">Todos los surtidores</option>
-
           {surtidores.map((surtidor) => (
-            <option key={surtidor.id} value={surtidor.id}>
-              {surtidor.nombre}
-            </option>
+            <option key={surtidor.id} value={surtidor.id}>{surtidor.nombre}</option>
           ))}
         </SelectField>
 
-        <SelectField
-          label="Estado de sesión"
-          value={filtros.estado}
-          onChange={(e) => setValue('estado', e.target.value)}
-        >
+        <SelectField label="Checador" value={filtros.checador_id} onChange={(e) => setValue('checador_id', e.target.value)}>
+          <option value="">Todos los checadores</option>
+          {checadores.map((checador) => (
+            <option key={checador.id} value={checador.id}>{checador.nombre_visible || checador.nombre_reporte}</option>
+          ))}
+        </SelectField>
+
+        <SelectField label="Estado de sesión" value={filtros.estado} onChange={(e) => setValue('estado', e.target.value)}>
           <option value="">Todos</option>
           <option value="EN_PROCESO">En proceso</option>
           <option value="FINALIZADO">Finalizado</option>
@@ -236,10 +220,11 @@ function FiltrosExportacion({
 export default function ExportacionesContent({ role = 'ADMIN' }) {
   const defaultFilters = {
     fecha: todayLocal(),
-    desde: addDays(todayLocal(), -7),
+    desde: monthStartLocal() || addDays(todayLocal(), -7),
     hasta: todayLocal(),
     sucursal_id: '',
     surtidor_id: '',
+    checador_id: '',
     estado: '',
     formato: 'xlsx'
   };
@@ -247,39 +232,37 @@ export default function ExportacionesContent({ role = 'ADMIN' }) {
   const [filtros, setFiltros] = useState(defaultFilters);
   const [sucursales, setSucursales] = useState([]);
   const [surtidores, setSurtidores] = useState([]);
-
+  const [checadores, setChecadores] = useState([]);
   const [downloading, setDownloading] = useState('');
   const [message, setMessage] = useState(null);
 
   function showMessage(type, text) {
     setMessage({ type, text });
-
-    window.setTimeout(() => {
-      setMessage(null);
-    }, 4500);
+    window.setTimeout(() => setMessage(null), 4500);
   }
 
   async function cargarCatalogos() {
     try {
-      const [sucursalesRes, surtidoresRes] = await Promise.all([
+      const [sucursalesRes, surtidoresRes, checadoresRes] = await Promise.all([
         sucursalesApi.listarActivas(),
-        surtidoresApi.listar({ activo: 1 })
+        surtidoresApi.listar({ activo: 1 }),
+        checadoresApi.listar({ activo: 1 })
       ]);
 
       setSucursales(sucursalesRes.sucursales || []);
       setSurtidores(surtidoresRes.surtidores || []);
+      setChecadores(checadoresRes.checadores || []);
     } catch {
       setSucursales([]);
       setSurtidores([]);
+      setChecadores([]);
     }
   }
 
   async function runDownload(key, fn) {
     try {
       setDownloading(key);
-
       await fn();
-
       showMessage('success', 'Descarga generada correctamente.');
     } catch (error) {
       showMessage('error', error.message || 'No se pudo generar la descarga.');
@@ -318,6 +301,24 @@ export default function ExportacionesContent({ role = 'ADMIN' }) {
     };
   }
 
+  function reporteGrupalParams() {
+    return {
+      desde: filtros.desde,
+      hasta: filtros.hasta,
+      sucursal_id: filtros.sucursal_id,
+      formato: filtros.formato
+    };
+  }
+
+  function checadoresParams() {
+    return {
+      desde: filtros.desde,
+      hasta: filtros.hasta,
+      checador_id: filtros.checador_id,
+      formato: filtros.formato
+    };
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarCatalogos();
@@ -327,96 +328,80 @@ export default function ExportacionesContent({ role = 'ADMIN' }) {
     <AdminShell
       role={role}
       title="Exportaciones"
-      subtitle="Descarga reportes de productividad, comparativos y sesiones para análisis externo."
+      subtitle="Descarga reportes de productividad, jornada, comparativos, acumulativos y checadores."
     >
       <div className="space-y-5">
-        {message ? (
-          <Message type={message.type}>
-            {message.text}
-          </Message>
-        ) : null}
+        {message ? <Message type={message.type}>{message.text}</Message> : null}
 
         <FiltrosExportacion
           filtros={filtros}
           setFiltros={setFiltros}
           sucursales={sucursales}
           surtidores={surtidores}
+          checadores={checadores}
           onReset={() => setFiltros(defaultFilters)}
         />
 
         <div className="grid min-w-0 gap-4 xl:grid-cols-3">
-          <ReportPanel
-            title="Reportes diarios"
-            subtitle="Usan la fecha diaria seleccionada."
-          >
+          <ReportPanel title="Productividad diaria" subtitle="Usa la fecha diaria seleccionada.">
             <div className="space-y-3">
               <ExportButton
-                label="Dashboard del día"
-                description="Excel con resumen, comparativo y ranking de surtidores."
-                icon={BarChart3}
+                label="Métricas de jornada"
+                description="Aprovechamiento, tiempo activo, tiempo muerto, ranking y horas pico."
+                icon={Clock3}
                 variant="red"
-                loading={downloading === 'dashboard-dia'}
-                onClick={() => runDownload('dashboard-dia', () =>
-                  exportacionesApi.dashboardDia(dailyParams())
-                )}
+                loading={downloading === 'metricas-jornada'}
+                onClick={() => runDownload('metricas-jornada', () => exportacionesApi.metricasJornada(dailyParams()))}
               />
-
+              <ExportButton
+                label="Dashboard del día"
+                description="Resumen, comparativo y ranking diario."
+                icon={BarChart3}
+                variant="dark"
+                loading={downloading === 'dashboard-dia'}
+                onClick={() => runDownload('dashboard-dia', () => exportacionesApi.dashboardDia(dailyParams()))}
+              />
               <ExportButton
                 label="Comparativo"
                 description="App contra reporte grupal por sucursal."
                 icon={FileSpreadsheet}
+                variant="white"
                 loading={downloading === 'comparativo'}
-                onClick={() => runDownload('comparativo', () =>
-                  exportacionesApi.comparativo(dailyParams())
-                )}
+                onClick={() => runDownload('comparativo', () => exportacionesApi.comparativo(dailyParams()))}
               />
+            </div>
+          </ReportPanel>
 
+          <ReportPanel title="Surtidores" subtitle="Concentrados y detalle operativo.">
+            <div className="space-y-3">
+              <ExportButton
+                label="Concentrado por surtidores"
+                description="Surtido total, partidas, ceros, negados, horas y ratios por surtidor."
+                icon={Warehouse}
+                variant="blue"
+                loading={downloading === 'concentrado-surtidores'}
+                onClick={() => runDownload('concentrado-surtidores', () => exportacionesApi.concentradoSurtidores(dailyParams()))}
+              />
               <ExportButton
                 label="Concentrado por sucursal"
                 description="Totales diarios agrupados por sucursal surtida."
                 icon={Store}
                 variant="white"
                 loading={downloading === 'concentrado-sucursales'}
-                onClick={() => runDownload('concentrado-sucursales', () =>
-                  exportacionesApi.concentradoSucursales(dailyParams())
-                )}
+                onClick={() => runDownload('concentrado-sucursales', () => exportacionesApi.concentradoSucursales(dailyParams()))}
               />
-            </div>
-          </ReportPanel>
-
-          <ReportPanel
-            title="Productividad individual"
-            subtitle="Exporta productividad por surtidor."
-          >
-            <div className="space-y-3">
-              <ExportButton
-                label="Concentrado por surtidores"
-                description="Sesiones, surtido total, partidas surtidas, ceros, negados, horas y ratios por surtidor."
-                icon={Warehouse}
-                variant="dark"
-                loading={downloading === 'concentrado-surtidores'}
-                onClick={() => runDownload('concentrado-surtidores', () =>
-                  exportacionesApi.concentradoSurtidores(dailyParams())
-                )}
-              />
-
               <ExportButton
                 label="Sesiones por fecha"
                 description="Detalle de sesiones de la fecha seleccionada."
                 icon={ClipboardList}
-                variant="white"
+                variant="dark"
                 loading={downloading === 'sesiones-fecha'}
-                onClick={() => runDownload('sesiones-fecha', () =>
-                  exportacionesApi.sesiones(sesionesFechaParams())
-                )}
+                onClick={() => runDownload('sesiones-fecha', () => exportacionesApi.sesiones(sesionesFechaParams()))}
               />
             </div>
           </ReportPanel>
 
-          <ReportPanel
-            title="Histórico / rango"
-            subtitle="Usa desde y hasta para descargar sesiones."
-          >
+          <ReportPanel title="Históricos y reportes nuevos" subtitle="Usan el rango desde/hasta.">
             <div className="space-y-3">
               <ExportButton
                 label="Sesiones por rango"
@@ -424,16 +409,30 @@ export default function ExportacionesContent({ role = 'ADMIN' }) {
                 icon={CalendarDays}
                 variant="dark"
                 loading={downloading === 'sesiones-rango'}
-                onClick={() => runDownload('sesiones-rango', () =>
-                  exportacionesApi.sesiones(sesionesRangoParams())
-                )}
+                onClick={() => runDownload('sesiones-rango', () => exportacionesApi.sesiones(sesionesRangoParams()))}
               />
-
-              <div className="rounded-3xl bg-amber-50 p-4 text-sm font-bold text-amber-700 ring-1 ring-amber-200">
-                Para reportes ejecutivos usa Excel. Para análisis rápido o importación externa usa CSV.
-              </div>
+              <ExportButton
+                label="Reporte grupal acumulativo"
+                description="Registros cargados desde Excel por día y sucursal."
+                icon={FileSpreadsheet}
+                variant="white"
+                loading={downloading === 'reporte-grupal'}
+                onClick={() => runDownload('reporte-grupal', () => exportacionesApi.reporteGrupal(reporteGrupalParams()))}
+              />
+              <ExportButton
+                label="Checadores"
+                description="Resumen, ranking, productividad por día y detalle de salidas."
+                icon={Users}
+                variant="red"
+                loading={downloading === 'checadores'}
+                onClick={() => runDownload('checadores', () => exportacionesApi.checadores(checadoresParams()))}
+              />
             </div>
           </ReportPanel>
+        </div>
+
+        <div className="rounded-3xl bg-amber-50 p-4 text-sm font-bold text-amber-700 ring-1 ring-amber-200">
+          Para reportes ejecutivos usa Excel. Para análisis rápido o importación externa usa CSV. En CSV, algunos reportes multi-hoja descargan solo la hoja principal.
         </div>
       </div>
     </AdminShell>

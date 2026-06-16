@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BarChart3,
   CheckCircle2,
+  Download,
   FileSpreadsheet,
   Loader2,
   RefreshCcw,
@@ -18,6 +19,7 @@ import AdminShell from './AdminShell';
 import ReportPanel from './ReportPanel';
 import PowerBiCard from './PowerBiCard';
 import { checadoresApi } from '@/lib/checadoresApi';
+import { exportacionesApi } from '@/lib/exportacionesApi';
 
 function todayLocal() {
   const date = new Date();
@@ -392,6 +394,7 @@ export default function ChecadoresContent({ role = 'ADMIN' }) {
   const [dashboard, setDashboard] = useState(null);
   const [reportes, setReportes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
 
   const params = useMemo(() => ({
@@ -418,6 +421,22 @@ export default function ChecadoresContent({ role = 'ADMIN' }) {
       setError(err.message || 'No se pudo cargar checadores.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function exportarChecadores() {
+    try {
+      setDownloading(true);
+      await exportacionesApi.checadores({
+        desde: filtros.desde,
+        hasta: filtros.hasta,
+        checador_id: filtros.checador_id,
+        formato: 'xlsx'
+      });
+    } catch (err) {
+      setError(err.message || 'No se pudo exportar checadores.');
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -512,9 +531,21 @@ export default function ChecadoresContent({ role = 'ADMIN' }) {
           title="Detalle del reporte"
           subtitle="Últimos registros importados según filtros."
           right={
-            <div className="inline-flex items-center gap-2 rounded-2xl bg-green-50 px-4 py-2 text-xs font-black text-green-700 ring-1 ring-green-200">
-              <CheckCircle2 size={15} />
-              {numberFormat(reportes.length)} visibles
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={exportarChecadores}
+                disabled={downloading}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-xs font-black text-white hover:bg-slate-800 disabled:opacity-60"
+              >
+                {downloading ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
+                Exportar
+              </button>
+
+              <div className="inline-flex items-center gap-2 rounded-2xl bg-green-50 px-4 py-2 text-xs font-black text-green-700 ring-1 ring-green-200">
+                <CheckCircle2 size={15} />
+                {numberFormat(reportes.length)} visibles
+              </div>
             </div>
           }
         >
