@@ -14,6 +14,8 @@ import {
   UserCheck,
   Warehouse,
   Download,
+  Activity,
+  UserCheck2,
 } from 'lucide-react';
 import UserAccountMenu from '@/components/UserAccountMenu';
 import AuthGuard from '@/components/AuthGuard';
@@ -23,6 +25,16 @@ const NAV_ADMIN = [
     label: 'Dashboard',
     href: '/admin/dashboard',
     icon: LayoutDashboard
+  },
+  {
+    label: 'Prod. surtidores',
+    href: '/admin/productividad/surtidores',
+    icon: Activity
+  },
+  {
+    label: 'Prod. checadores',
+    href: '/admin/productividad/checadores',
+    icon: UserCheck
   },
   {
     label: 'Exportaciones',
@@ -71,6 +83,16 @@ const NAV_SUPERVISOR = [
     label: 'Dashboard',
     href: '/supervisor/dashboard',
     icon: LayoutDashboard
+  },
+  {
+    label: 'Prod. surtidores',
+    href: '/supervisor/productividad/surtidores',
+    icon: Activity
+  },
+  {
+    label: 'Prod. checadores',
+    href: '/supervisor/productividad/checadores',
+    icon: UserCheck
   },
   {
     label: 'Sesiones',
