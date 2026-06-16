@@ -65,8 +65,12 @@ function partidasSurtidas(row = {}) {
     return Number(row.partidas_surtidas ?? row.partidas ?? 0);
 }
 
-function horasLaborales(row = {}) {
+function horasActivas(row = {}) {
     return Number(row.tiempo_activo_laboral_horas ?? row.duracion_laboral_horas ?? row.duracion_horas ?? 0);
+}
+
+function horasMuertas(row = {}) {
+    return Number(row.tiempo_muerto_operativo_horas ?? row.tiempo_muerto_laboral_horas ?? 0);
 }
 
 function partidasPorHora(row = {}) {
@@ -335,8 +339,10 @@ function RankingSurtidores({ rows }) {
                                 </div>
 
                                 <div className="rounded-2xl bg-slate-50 p-2">
-                                    <p className="font-bold text-slate-500">Horas activas</p>
-                                    <p className="font-black text-slate-950">{decimal(horasLaborales(row))}</p>
+                                    <p className="font-bold text-slate-500">Activo / muerto</p>
+                                    <p className="font-black text-slate-950">
+                                        {decimal(horasActivas(row))} / {decimal(horasMuertas(row))}
+                                    </p>
                                 </div>
                             </div>
 
@@ -509,13 +515,13 @@ function ProductividadJornadaPanel({ productividad }) {
     }
 
     const jornada = resumen.jornada || {};
-    const aprovechamiento = Number(resumen.aprovechamiento_turno_pct || 0);
-    const muertoPct = Math.max(0, 100 - aprovechamiento);
+    const aprovechamiento = Number(resumen.aprovechamiento_operativo_pct ?? resumen.aprovechamiento_turno_pct ?? 0);
+    const aprovechamientoJornada = Number(resumen.aprovechamiento_jornada_pct || 0);
 
     return (
         <ReportPanel
             title="Productividad por jornada"
-            subtitle="Aprovechamiento del turno laboral según horario Ciudad de México."
+            subtitle="Horas de inicio/fin, tiempo activo y tiempo muerto entre surtidos."
         >
             <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -530,9 +536,9 @@ function ProductividadJornadaPanel({ productividad }) {
                     </div>
 
                     <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Disponible equipo</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Horas-equipo transcurridas</p>
                         <p className="mt-2 text-lg font-black text-slate-950">
-                            {decimal(jornada.jornada_disponible_equipo_horas)} h
+                            {decimal(jornada.horas_equipo_transcurridas_horas ?? jornada.jornada_disponible_equipo_horas)} h
                         </p>
                         <p className="mt-1 text-xs font-semibold text-slate-500">
                             {number(resumen.surtidores_activos)} surtidores activos
@@ -552,7 +558,7 @@ function ProductividadJornadaPanel({ productividad }) {
 
                 <div>
                     <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="font-black text-slate-700">Aprovechamiento del turno</span>
+                        <span className="font-black text-slate-700">Aprovechamiento operativo</span>
                         <span className="font-black text-slate-950">{pct(aprovechamiento)}</span>
                     </div>
                     <div className="h-4 overflow-hidden rounded-full bg-slate-100">
@@ -561,9 +567,10 @@ function ProductividadJornadaPanel({ productividad }) {
                             style={{ width: `${Math.min(100, aprovechamiento)}%` }}
                         />
                     </div>
-                    <div className="mt-2 flex justify-between gap-3 text-xs font-bold text-slate-500">
+                    <div className="mt-2 grid gap-1 text-xs font-bold text-slate-500 sm:grid-cols-3">
                         <span>Activo: {decimal(resumen.tiempo_activo_laboral_horas)} h</span>
-                        <span>Muerto: {decimal(resumen.tiempo_muerto_laboral_horas)} h ({pct(muertoPct)})</span>
+                        <span>Muerto entre surtidos: {decimal(resumen.tiempo_muerto_operativo_horas ?? resumen.tiempo_muerto_laboral_horas)} h</span>
+                        <span>Jornada: {pct(aprovechamientoJornada)}</span>
                     </div>
                 </div>
             </div>
@@ -761,17 +768,17 @@ export default function PowerBiDashboard({
                             />
 
                             <PowerBiCard
-                                title="Aprovechamiento"
-                                value={pct(kpis.aprovechamiento_turno_pct)}
-                                subtitle="Activo laboral / jornada disponible"
+                                title="Aprovechamiento operativo"
+                                value={pct(kpis.aprovechamiento_operativo_pct ?? kpis.aprovechamiento_turno_pct)}
+                                subtitle="Activo / activo + muerto entre surtidos"
                                 icon={TrendingUp}
                                 tone="blue"
                             />
 
                             <PowerBiCard
                                 title="Tiempo muerto"
-                                value={`${decimal(kpis.tiempo_muerto_laboral_horas)} h`}
-                                subtitle="Dentro de jornada laboral"
+                                value={`${decimal(kpis.tiempo_muerto_operativo_horas ?? kpis.tiempo_muerto_laboral_horas)} h`}
+                                subtitle="Entre fin de surtido e inicio del siguiente"
                                 icon={Clock}
                                 tone="default"
                             />
@@ -779,9 +786,9 @@ export default function PowerBiDashboard({
 
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             <PowerBiCard
-                                title="Partidas/h activa"
-                                value={decimal(kpis.partidas_por_hora_activa)}
-                                subtitle={`${decimal(kpis.tiempo_activo_laboral_horas)} h activas`}
+                                title="Tiempo activo"
+                                value={`${decimal(kpis.tiempo_activo_laboral_horas)} h`}
+                                subtitle={`${decimal(kpis.partidas_por_hora_activa)} partidas/h activa`}
                                 icon={Warehouse}
                                 tone="soft"
                             />
