@@ -391,7 +391,7 @@ export default function ExportacionesContent({ role = 'ADMIN' }) {
             <div className="space-y-3">
               <ExportButton
                 label="Concentrado por surtidores"
-                description="Sesiones, tickets, partidas, monto, horas y ratios por surtidor."
+                description="Sesiones, surtido total, partidas surtidas, ceros, negados, horas y ratios por surtidor."
                 icon={Warehouse}
                 variant="dark"
                 loading={downloading === 'concentrado-surtidores'}

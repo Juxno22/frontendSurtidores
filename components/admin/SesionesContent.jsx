@@ -12,9 +12,7 @@ import {
   RefreshCcw,
   Save,
   SlidersHorizontal,
-  TimerReset,
-  UserRound,
-  XCircle
+  TimerReset
 } from 'lucide-react';
 
 import AdminShell from './AdminShell';
@@ -34,18 +32,30 @@ function number(value) {
   return new Intl.NumberFormat('es-MX').format(Number(value || 0));
 }
 
-function money(value) {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    maximumFractionDigits: 0
-  }).format(Number(value || 0));
-}
-
 function decimal(value) {
   return new Intl.NumberFormat('es-MX', {
     maximumFractionDigits: 2
   }).format(Number(value || 0));
+}
+
+function surtidoTotal(row = {}) {
+  return Number(row.surtido_total ?? row.tickets ?? 0);
+}
+
+function partidasSurtidas(row = {}) {
+  return Number(row.partidas_surtidas ?? row.partidas ?? 0);
+}
+
+function negados(row = {}) {
+  return Number(row.negados ?? row.no_surtido ?? 0);
+}
+
+function horasLaborales(row = {}) {
+  return Number(row.duracion_laboral_horas ?? row.duracion_horas ?? 0);
+}
+
+function partidasPorHora(row = {}) {
+  return Number(row.partidas_por_hora_laboral ?? row.partidas_por_hora ?? 0);
 }
 
 function formatDate(value) {
@@ -104,7 +114,7 @@ function Input({ label, name, value, onChange, type = 'number', placeholder = '0
         onChange={onChange}
         type={type}
         min={type === 'number' ? '0' : undefined}
-        step={name === 'monto' ? '0.01' : '1'}
+        step="1"
         placeholder={placeholder}
         className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
       />
@@ -263,11 +273,10 @@ function SesionesTable({ sesiones, loading, onSelect }) {
                 <th className="px-3 py-2">Surtidor</th>
                 <th className="px-3 py-2">Sucursal</th>
                 <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2 text-right">Tickets</th>
-                <th className="px-3 py-2 text-right">Partidas</th>
-                <th className="px-3 py-2 text-right">Monto</th>
-                <th className="px-3 py-2 text-right">Horas</th>
-                <th className="px-3 py-2 text-right">Partidas/h</th>
+                <th className="px-3 py-2 text-right">Surtido total</th>
+                <th className="px-3 py-2 text-right">Partidas surtidas</th>
+                <th className="px-3 py-2 text-right">Horas laborales</th>
+                <th className="px-3 py-2 text-right">Partidas/h laboral</th>
                 <th className="px-3 py-2">Acción</th>
               </tr>
             </thead>
@@ -298,23 +307,19 @@ function SesionesTable({ sesiones, loading, onSelect }) {
                   </td>
 
                   <td className="px-3 py-4 text-right font-black">
-                    {number(sesion.tickets)}
+                    {number(surtidoTotal(sesion))}
                   </td>
 
                   <td className="px-3 py-4 text-right font-black">
-                    {number(sesion.partidas)}
+                    {number(partidasSurtidas(sesion))}
                   </td>
 
                   <td className="px-3 py-4 text-right font-black">
-                    {money(sesion.monto)}
+                    {decimal(horasLaborales(sesion))}
                   </td>
 
                   <td className="px-3 py-4 text-right font-black">
-                    {decimal(sesion.duracion_horas)}
-                  </td>
-
-                  <td className="px-3 py-4 text-right font-black">
-                    {decimal(sesion.partidas_por_hora)}
+                    {decimal(partidasPorHora(sesion))}
                   </td>
 
                   <td className="rounded-r-2xl px-3 py-4">
@@ -387,11 +392,9 @@ function DetalleSesion({ sesion, eventos, onClose, onAdjusted }) {
     motivo: '',
     fecha_operativa: '',
     sucursal_id: '',
-    tickets: '',
-    partidas: '',
-    monto: '',
+    partidas_surtidas: '',
     ceros: '',
-    no_surtido: '',
+    negados: '',
     observaciones: ''
   });
 
@@ -403,11 +406,9 @@ function DetalleSesion({ sesion, eventos, onClose, onAdjusted }) {
       motivo: '',
       fecha_operativa: formatDate(sesion.fecha_operativa),
       sucursal_id: sesion.sucursal_id || '',
-      tickets: sesion.tickets ?? '',
-      partidas: sesion.partidas ?? '',
-      monto: sesion.monto ?? '',
+      partidas_surtidas: sesion.partidas_surtidas ?? sesion.partidas ?? '',
       ceros: sesion.ceros ?? '',
-      no_surtido: sesion.no_surtido ?? '',
+      negados: sesion.negados ?? sesion.no_surtido ?? '',
       observaciones: sesion.observaciones || ''
     });
   }, [sesion]);
@@ -442,11 +443,14 @@ function DetalleSesion({ sesion, eventos, onClose, onAdjusted }) {
         motivo: ajuste.motivo.trim(),
         fecha_operativa: ajuste.fecha_operativa,
         sucursal_id: Number(ajuste.sucursal_id),
-        tickets: Number(ajuste.tickets || 0),
-        partidas: Number(ajuste.partidas || 0),
-        monto: Number(ajuste.monto || 0),
+        surtido_total: Number(ajuste.partidas_surtidas || 0) + Number(ajuste.ceros || 0) + Number(ajuste.negados || 0),
+        tickets: Number(ajuste.partidas_surtidas || 0) + Number(ajuste.ceros || 0) + Number(ajuste.negados || 0),
+        partidas_surtidas: Number(ajuste.partidas_surtidas || 0),
+        partidas: Number(ajuste.partidas_surtidas || 0),
         ceros: Number(ajuste.ceros || 0),
-        no_surtido: Number(ajuste.no_surtido || 0),
+        negados: Number(ajuste.negados || 0),
+        no_surtido: Number(ajuste.negados || 0),
+        monto: 0,
         observaciones: ajuste.observaciones
       });
 
@@ -480,15 +484,13 @@ function DetalleSesion({ sesion, eventos, onClose, onAdjusted }) {
           <MiniKpi label="Inicio" value={formatDateTime(sesion.hora_inicio)} icon={Clock} />
           <MiniKpi label="Fin" value={formatDateTime(sesion.hora_fin)} icon={TimerReset} />
 
-          <MiniKpi label="Tickets" value={number(sesion.tickets)} />
-          <MiniKpi label="Partidas" value={number(sesion.partidas)} />
-          <MiniKpi label="Monto" value={money(sesion.monto)} />
-          <MiniKpi label="Horas" value={decimal(sesion.duracion_horas)} />
+          <MiniKpi label="Surtido total" value={number(surtidoTotal(sesion))} />
+          <MiniKpi label="Partidas surtidas" value={number(partidasSurtidas(sesion))} />
+          <MiniKpi label="Horas laborales" value={decimal(horasLaborales(sesion))} />
 
           <MiniKpi label="Ceros" value={number(sesion.ceros)} />
-          <MiniKpi label="No surtido / Negados" value={number(sesion.no_surtido)} />
-          <MiniKpi label="Tickets/h" value={decimal(sesion.tickets_por_hora)} />
-          <MiniKpi label="Partidas/h" value={decimal(sesion.partidas_por_hora)} />
+          <MiniKpi label="Negados" value={number(negados(sesion))} />
+          <MiniKpi label="Partidas/h laboral" value={decimal(partidasPorHora(sesion))} />
         </div>
 
         {sesion.observaciones ? (
@@ -543,11 +545,9 @@ function DetalleSesion({ sesion, eventos, onClose, onAdjusted }) {
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <Input label="Fecha operativa" name="fecha_operativa" type="date" value={ajuste.fecha_operativa} onChange={handleChange} />
-              <Input label="Tickets" name="tickets" value={ajuste.tickets} onChange={handleChange} />
-              <Input label="Partidas" name="partidas" value={ajuste.partidas} onChange={handleChange} />
-              <Input label="Monto" name="monto" value={ajuste.monto} onChange={handleChange} />
+              <Input label="Partidas surtidas" name="partidas_surtidas" value={ajuste.partidas_surtidas} onChange={handleChange} />
               <Input label="Ceros" name="ceros" value={ajuste.ceros} onChange={handleChange} />
-              <Input label="No surtido / Negados" name="no_surtido" value={ajuste.no_surtido} onChange={handleChange} />
+              <Input label="Negados" name="negados" value={ajuste.negados} onChange={handleChange} />
             </div>
 
             <label className="block">
@@ -609,9 +609,8 @@ export default function SesionesContent({ role = 'ADMIN' }) {
   const resumen = useMemo(() => {
     return sesiones.reduce((acc, sesion) => {
       acc.total += 1;
-      acc.tickets += Number(sesion.tickets || 0);
-      acc.partidas += Number(sesion.partidas || 0);
-      acc.monto += Number(sesion.monto || 0);
+      acc.surtido_total += surtidoTotal(sesion);
+      acc.partidas_surtidas += partidasSurtidas(sesion);
 
       if (sesion.estado === 'EN_PROCESO') acc.enProceso += 1;
       if (sesion.estado === 'FINALIZADO') acc.finalizadas += 1;
@@ -623,9 +622,8 @@ export default function SesionesContent({ role = 'ADMIN' }) {
       enProceso: 0,
       finalizadas: 0,
       canceladas: 0,
-      tickets: 0,
-      partidas: 0,
-      monto: 0
+      surtido_total: 0,
+      partidas_surtidas: 0
     });
   }, [sesiones]);
 
@@ -715,7 +713,7 @@ export default function SesionesContent({ role = 'ADMIN' }) {
           <MiniKpi label="Sesiones" value={number(resumen.total)} icon={Activity} />
           <MiniKpi label="Finalizadas" value={number(resumen.finalizadas)} icon={CheckCircle2} />
           <MiniKpi label="En proceso" value={number(resumen.enProceso)} icon={Clock} />
-          <MiniKpi label="Monto" value={money(resumen.monto)} icon={UserRound} />
+          <MiniKpi label="Surtido total" value={number(resumen.surtido_total)} icon={Activity} />
         </div>
 
         <FiltrosSesiones

@@ -3,10 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  CheckCircle2,
   Clock,
   Loader2,
-  LogOut,
   PackageCheck,
   Play,
   RotateCcw,
@@ -15,6 +13,7 @@ import {
   Store,
   XCircle
 } from 'lucide-react';
+
 import UserAccountMenu from '@/components/UserAccountMenu';
 import AuthGuard from '@/components/AuthGuard';
 import { getUser } from '@/lib/auth';
@@ -27,18 +26,22 @@ import {
 } from '@/lib/sessionDraftDb';
 
 const EMPTY_FORM = {
-  tickets: '',
-  partidas: '',
-  monto: '',
+  partidas_surtidas: '',
   ceros: '',
-  no_surtido: '',
+  negados: '',
   observaciones: ''
 };
 
 function numberOrZero(value) {
   if (value === '' || value === null || value === undefined) return 0;
+
   const number = Number(value);
+
   return Number.isFinite(number) ? number : 0;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('es-MX').format(Number(value || 0));
 }
 
 function secondsToClock(seconds) {
@@ -54,13 +57,42 @@ function secondsToClock(seconds) {
   ].join(':');
 }
 
-function buildPayload(form) {
+function getSurtidoTotal(form) {
+  return (
+    numberOrZero(form.partidas_surtidas) +
+    numberOrZero(form.ceros) +
+    numberOrZero(form.negados)
+  );
+}
+
+function getFormFromSesionOrDraft(source = {}) {
   return {
-    tickets: numberOrZero(form.tickets),
-    partidas: numberOrZero(form.partidas),
-    monto: numberOrZero(form.monto),
-    ceros: numberOrZero(form.ceros),
-    no_surtido: numberOrZero(form.no_surtido),
+    partidas_surtidas: source.partidas_surtidas ?? source.partidas ?? '',
+    ceros: source.ceros ?? '',
+    negados: source.negados ?? source.no_surtido ?? '',
+    observaciones: source.observaciones ?? ''
+  };
+}
+
+function buildPayload(form) {
+  const partidasSurtidas = numberOrZero(form.partidas_surtidas);
+  const ceros = numberOrZero(form.ceros);
+  const negados = numberOrZero(form.negados);
+  const surtidoTotal = partidasSurtidas + ceros + negados;
+
+  return {
+    surtido_total: surtidoTotal,
+    tickets: surtidoTotal,
+
+    partidas_surtidas: partidasSurtidas,
+    partidas: partidasSurtidas,
+
+    ceros,
+
+    negados,
+    no_surtido: negados,
+
+    monto: 0,
     observaciones: String(form.observaciones || '').trim()
   };
 }
@@ -69,7 +101,7 @@ function Header({ user }) {
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-        <div className="fgitlex items-center gap-3">
+        <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-primary)] text-white shadow">
             <PackageCheck size={23} />
           </div>
@@ -83,6 +115,7 @@ function Header({ user }) {
             </h1>
           </div>
         </div>
+
         <UserAccountMenu compact />
       </div>
     </header>
@@ -117,7 +150,8 @@ function Field({ label, name, value, onChange, type = 'number', placeholder = '0
         onChange={onChange}
         type={type}
         min={type === 'number' ? '0' : undefined}
-        step={name === 'monto' ? '0.01' : '1'}
+        step="1"
+        inputMode={type === 'number' ? 'numeric' : undefined}
         placeholder={placeholder}
         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
       />
@@ -144,7 +178,7 @@ function StartSessionView({
             Iniciar surtido
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Selecciona la sucursal que vas a surtir. El tiempo oficial lo toma el servidor.
+            Selecciona la sucursal que vas a surtir. El tiempo oficial lo toma el servidor con horario de Ciudad de México.
           </p>
         </div>
       </div>
@@ -194,18 +228,19 @@ function ActiveSessionView({
   elapsedSeconds,
   lastLocalSave
 }) {
+  const surtidoTotal = getSurtidoTotal(form);
+
   const metricas = useMemo(() => {
     const horas = elapsedSeconds / 3600;
-    const tickets = numberOrZero(form.tickets);
-    const partidas = numberOrZero(form.partidas);
-    const monto = numberOrZero(form.monto);
+    const partidasSurtidas = numberOrZero(form.partidas_surtidas);
+    const negados = numberOrZero(form.negados);
 
     return {
-      ticketsHora: horas > 0 ? (tickets / horas).toFixed(2) : '0.00',
-      partidasHora: horas > 0 ? (partidas / horas).toFixed(2) : '0.00',
-      montoHora: horas > 0 ? (monto / horas).toFixed(2) : '0.00'
+      surtidoHora: horas > 0 ? (surtidoTotal / horas).toFixed(2) : '0.00',
+      partidasHora: horas > 0 ? (partidasSurtidas / horas).toFixed(2) : '0.00',
+      negadosHora: horas > 0 ? (negados / horas).toFixed(2) : '0.00'
     };
-  }, [elapsedSeconds, form]);
+  }, [elapsedSeconds, form, surtidoTotal]);
 
   return (
     <section className="space-y-4">
@@ -236,8 +271,8 @@ function ActiveSessionView({
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
           <div className="rounded-2xl bg-white/10 p-3">
-            <p className="text-slate-400">Tickets/h</p>
-            <p className="mt-1 text-base font-black">{metricas.ticketsHora}</p>
+            <p className="text-slate-400">Surtido/h</p>
+            <p className="mt-1 text-base font-black">{metricas.surtidoHora}</p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-3">
@@ -246,8 +281,8 @@ function ActiveSessionView({
           </div>
 
           <div className="rounded-2xl bg-white/10 p-3">
-            <p className="text-slate-400">Monto/h</p>
-            <p className="mt-1 text-base font-black">${metricas.montoHora}</p>
+            <p className="text-slate-400">Negados/h</p>
+            <p className="mt-1 text-base font-black">{metricas.negadosHora}</p>
           </div>
         </div>
       </div>
@@ -259,7 +294,7 @@ function ActiveSessionView({
               Captura del proceso
             </h3>
             <p className="text-xs text-slate-500">
-              Se guarda localmente mientras capturas.
+              Surtido total se calcula automático: partidas surtidas + ceros + negados.
             </p>
           </div>
 
@@ -270,18 +305,35 @@ function ActiveSessionView({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Tickets" name="tickets" value={form.tickets} onChange={onChange} />
-          <Field label="Partidas" name="partidas" value={form.partidas} onChange={onChange} />
-          <Field label="Monto" name="monto" value={form.monto} onChange={onChange} />
-          <Field label="Ceros" name="ceros" value={form.ceros} onChange={onChange} />
+        <div className="mb-4 rounded-3xl bg-slate-950 p-4 text-white">
+          <p className="text-xs font-black uppercase tracking-widest text-white/50">
+            Surtido total
+          </p>
+          <p className="mt-1 text-4xl font-black">
+            {formatNumber(surtidoTotal)}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-white/60">
+            {formatNumber(numberOrZero(form.partidas_surtidas))} partidas + {formatNumber(numberOrZero(form.ceros))} ceros + {formatNumber(numberOrZero(form.negados))} negados
+          </p>
         </div>
 
-        <div className="mt-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field
-            label="No surtido / Negados"
-            name="no_surtido"
-            value={form.no_surtido}
+            label="Partidas surtidas"
+            name="partidas_surtidas"
+            value={form.partidas_surtidas}
+            onChange={onChange}
+          />
+          <Field
+            label="Ceros"
+            name="ceros"
+            value={form.ceros}
+            onChange={onChange}
+          />
+          <Field
+            label="Negados"
+            name="negados"
+            value={form.negados}
             onChange={onChange}
           />
         </div>
@@ -390,26 +442,16 @@ function SurtidorContent() {
         const draft = await getSessionDraft(draftKey);
 
         if (draft) {
-          setForm({
-            tickets: draft.tickets ?? '',
-            partidas: draft.partidas ?? '',
-            monto: draft.monto ?? '',
-            ceros: draft.ceros ?? '',
-            no_surtido: draft.no_surtido ?? '',
-            observaciones: draft.observaciones ?? ''
-          });
-
+          setForm(getFormFromSesionOrDraft(draft));
           showMessage('success', 'Se recuperó tu borrador local.');
         } else {
-          setForm({
-            tickets: active.tickets || '',
-            partidas: active.partidas || '',
-            monto: active.monto || '',
-            ceros: active.ceros || '',
-            no_surtido: active.no_surtido || '',
-            observaciones: active.observaciones || ''
-          });
+          setForm(getFormFromSesionOrDraft(active));
         }
+      } else {
+        setSesion(null);
+        setForm(EMPTY_FORM);
+        setElapsedBase(0);
+        setElapsedExtra(0);
       }
     } catch (error) {
       showMessage('error', error.message || 'No se pudo cargar la información.');
@@ -424,7 +466,7 @@ function SurtidorContent() {
   }, []);
 
   useEffect(() => {
-    if (!sesion) return;
+    if (!sesion) return undefined;
 
     const interval = window.setInterval(() => {
       setElapsedExtra((prev) => prev + 1);
@@ -434,7 +476,7 @@ function SurtidorContent() {
   }, [sesion]);
 
   useEffect(() => {
-    if (!sesion) return;
+    if (!sesion) return undefined;
 
     const timeout = window.setTimeout(async () => {
       try {
@@ -515,7 +557,7 @@ function SurtidorContent() {
 
     const payload = buildPayload(form);
 
-    if (payload.tickets === 0 && payload.partidas === 0 && payload.monto === 0) {
+    if (payload.surtido_total === 0) {
       const confirmEmpty = window.confirm(
         'La sesión está en ceros. ¿Seguro que quieres finalizarla así?'
       );
@@ -589,11 +631,6 @@ function SurtidorContent() {
     }
   }
 
-  function handleLogout() {
-    clearSession();
-    window.location.href = '/login';
-  }
-
   if (loadingPage) {
     return (
       <main className="min-h-screen bg-slate-100">
@@ -664,8 +701,7 @@ function SurtidorContent() {
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 shrink-0 text-amber-500" size={17} />
             <p>
-              El tiempo oficial lo calcula el servidor. La información local solo sirve para recuperar
-              tu captura si se cierra la página o se pierde conexión momentáneamente.
+              El tiempo oficial lo calcula el servidor en horario de Ciudad de México. La información local solo sirve para recuperar tu captura si se cierra la página o se pierde conexión momentáneamente.
             </p>
           </div>
         </div>

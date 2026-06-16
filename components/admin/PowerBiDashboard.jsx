@@ -11,7 +11,6 @@ import {
     RefreshCcw,
     Store,
     TrendingUp,
-    Users,
     Warehouse
 } from 'lucide-react';
 
@@ -44,14 +43,6 @@ function addDays(dateString, days) {
     return `${year}-${month}-${day}`;
 }
 
-function money(value) {
-    return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-        maximumFractionDigits: 0
-    }).format(Number(value || 0));
-}
-
 function number(value) {
     return new Intl.NumberFormat('es-MX').format(Number(value || 0));
 }
@@ -60,6 +51,22 @@ function decimal(value) {
     return new Intl.NumberFormat('es-MX', {
         maximumFractionDigits: 2
     }).format(Number(value || 0));
+}
+
+function surtidoTotal(row = {}) {
+    return Number(row.surtido_total ?? row.tickets ?? 0);
+}
+
+function partidasSurtidas(row = {}) {
+    return Number(row.partidas_surtidas ?? row.partidas ?? 0);
+}
+
+function horasLaborales(row = {}) {
+    return Number(row.duracion_laboral_horas ?? row.duracion_horas ?? 0);
+}
+
+function partidasPorHora(row = {}) {
+    return Number(row.partidas_por_hora_laboral ?? row.partidas_por_hora ?? 0);
 }
 
 function DashboardButton({ children, onClick, variant = 'default', disabled = false }) {
@@ -246,7 +253,7 @@ function ComparativoResumen({ resumen }) {
 
             <div className="mt-4 space-y-2 rounded-3xl bg-slate-50 p-4">
                 <div className="flex justify-between text-sm">
-                    <span className="font-bold text-slate-600">Dif. tickets</span>
+                    <span className="font-bold text-slate-600">Dif. surtido total</span>
                     <span className="font-black text-slate-950">{number(diferencias.tickets)}</span>
                 </div>
 
@@ -270,12 +277,12 @@ function ComparativoResumen({ resumen }) {
 }
 
 function RankingSurtidores({ rows }) {
-    const maxPartidas = Math.max(...rows.map((row) => Number(row.partidas || 0)), 0);
+    const maxPartidas = Math.max(...rows.map((row) => partidasSurtidas(row)), 0);
 
     return (
         <ReportPanel
             title="Ranking de surtidores"
-            subtitle="Ordenado por productividad de partidas por hora."
+            subtitle="Ordenado por productividad de partidas surtidas por hora laboral."
         >
             {rows.length === 0 ? (
                 <EmptyPanel text="Sin surtidores con sesiones finalizadas en esta fecha." />
@@ -298,34 +305,34 @@ function RankingSurtidores({ rows }) {
 
                                 <div className="rounded-2xl bg-slate-950 px-3 py-2 text-right text-white">
                                     <p className="text-[10px] font-black uppercase text-white/60">
-                                        Partidas/h
+                                        Partidas/h laboral
                                     </p>
                                     <p className="text-sm font-black">
-                                        {decimal(row.partidas_por_hora)}
+                                        {decimal(partidasPorHora(row))}
                                     </p>
                                 </div>
                             </div>
 
                             <MiniBar
-                                label={`${number(row.partidas)} partidas`}
-                                value={row.partidas}
+                                label={`${number(partidasSurtidas(row))} partidas surtidas`}
+                                value={partidasSurtidas(row)}
                                 max={maxPartidas}
                             />
 
                             <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
                                 <div className="rounded-2xl bg-slate-50 p-2">
-                                    <p className="font-bold text-slate-500">Tickets</p>
-                                    <p className="font-black text-slate-950">{number(row.tickets)}</p>
+                                    <p className="font-bold text-slate-500">Surtido total</p>
+                                    <p className="font-black text-slate-950">{number(surtidoTotal(row))}</p>
                                 </div>
 
                                 <div className="rounded-2xl bg-slate-50 p-2">
-                                    <p className="font-bold text-slate-500">Monto</p>
-                                    <p className="font-black text-slate-950">{money(row.monto)}</p>
+                                    <p className="font-bold text-slate-500">Negados</p>
+                                    <p className="font-black text-slate-950">{number(row.negados ?? row.no_surtido)}</p>
                                 </div>
 
                                 <div className="rounded-2xl bg-slate-50 p-2">
                                     <p className="font-bold text-slate-500">Horas</p>
-                                    <p className="font-black text-slate-950">{decimal(row.duracion_horas)}</p>
+                                    <p className="font-black text-slate-950">{decimal(horasLaborales(row))}</p>
                                 </div>
                             </div>
                         </div>
@@ -351,12 +358,11 @@ function SucursalesTable({ rows }) {
                             <tr className="text-xs uppercase tracking-widest text-slate-400">
                                 <th className="px-3 py-2">Sucursal</th>
                                 <th className="px-3 py-2">Estado</th>
-                                <th className="px-3 py-2 text-right">Tickets</th>
-                                <th className="px-3 py-2 text-right">Partidas</th>
-                                <th className="px-3 py-2 text-right">Monto</th>
-                                <th className="px-3 py-2 text-right">Dif. tickets</th>
+                                <th className="px-3 py-2 text-right">Surtido total</th>
+                                <th className="px-3 py-2 text-right">Partidas surtidas</th>
+                                <th className="px-3 py-2 text-right">Dif. surtido total</th>
                                 <th className="px-3 py-2 text-right">Dif. partidas</th>
-                                <th className="px-3 py-2 text-right">Partidas/h</th>
+                                <th className="px-3 py-2 text-right">Partidas/h laboral</th>
                             </tr>
                         </thead>
 
@@ -375,15 +381,11 @@ function SucursalesTable({ rows }) {
                                     </td>
 
                                     <td className="px-3 py-4 text-right font-black">
-                                        {number(row.app?.tickets)}
+                                        {number(surtidoTotal(row.app))}
                                     </td>
 
                                     <td className="px-3 py-4 text-right font-black">
-                                        {number(row.app?.partidas)}
-                                    </td>
-
-                                    <td className="px-3 py-4 text-right font-black">
-                                        {money(row.app?.monto)}
+                                        {number(partidasSurtidas(row.app))}
                                     </td>
 
                                     <td className="px-3 py-4 text-right font-black">
@@ -395,7 +397,7 @@ function SucursalesTable({ rows }) {
                                     </td>
 
                                     <td className="rounded-r-2xl px-3 py-4 text-right font-black">
-                                        {decimal(row.app?.partidas_por_hora)}
+                                        {decimal(partidasPorHora(row.app))}
                                     </td>
                                 </tr>
                             ))}
@@ -457,12 +459,12 @@ function PendientesPanel({ pendientes }) {
 }
 
 function TendenciaPanel({ tendencia }) {
-    const maxPartidas = Math.max(...tendencia.map((row) => Number(row.app?.partidas || 0)), 0);
+    const maxPartidas = Math.max(...tendencia.map((row) => partidasSurtidas(row.app)), 0);
 
     return (
         <ReportPanel
             title="Tendencia reciente"
-            subtitle="Últimos 7 días de partidas capturadas en app."
+            subtitle="Últimos 7 días de partidas surtidas capturadas en app."
         >
             {tendencia.length === 0 ? (
                 <EmptyPanel text="Sin tendencia disponible." />
@@ -472,7 +474,7 @@ function TendenciaPanel({ tendencia }) {
                         <MiniBar
                             key={row.fecha}
                             label={row.fecha}
-                            value={row.app?.partidas || 0}
+                            value={partidasSurtidas(row.app)}
                             max={maxPartidas}
                         />
                     ))}
@@ -590,31 +592,31 @@ export default function PowerBiDashboard({
                     <>
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             <PowerBiCard
-                                title="Tickets"
-                                value={number(kpis.tickets)}
+                                title="Surtido total"
+                                value={number(kpis.surtido_total ?? kpis.tickets)}
                                 subtitle={`${number(kpis.sesiones_finalizadas)} sesiones finalizadas`}
                                 icon={PackageCheck}
                                 tone="dark"
                             />
 
                             <PowerBiCard
-                                title="Partidas"
-                                value={number(kpis.partidas)}
-                                subtitle={`${decimal(kpis.partidas_por_hora)} partidas/hora`}
+                                title="Partidas surtidas"
+                                value={number(kpis.partidas_surtidas ?? kpis.partidas)}
+                                subtitle={`${decimal(kpis.partidas_por_hora_laboral ?? kpis.partidas_por_hora)} partidas/h laboral`}
                                 icon={BarChart3}
                                 tone="red"
                             />
 
                             <PowerBiCard
-                                title="Monto"
-                                value={money(kpis.monto)}
-                                subtitle={`${money(kpis.monto_por_hora)} por hora`}
+                                title="Horas laborales"
+                                value={`${decimal(kpis.duracion_laboral_horas ?? kpis.duracion_horas)} h`}
+                                subtitle="Tiempo válido dentro de jornada"
                                 icon={TrendingUp}
                                 tone="blue"
                             />
 
                             <PowerBiCard
-                                title="Tiempo"
+                                title="Tiempo real"
                                 value={`${decimal(kpis.duracion_horas)} h`}
                                 subtitle={`${number(kpis.surtidores_con_captura)} surtidores con captura`}
                                 icon={Clock}
@@ -632,7 +634,7 @@ export default function PowerBiDashboard({
                             />
 
                             <PowerBiCard
-                                title="No surtido / Negados"
+                                title="Negados"
                                 value={number(kpis.no_surtido)}
                                 subtitle="Mismo campo operativo"
                                 icon={FileWarning}
@@ -640,7 +642,7 @@ export default function PowerBiDashboard({
                             />
 
                             <PowerBiCard
-                                title="Dif. tickets"
+                                title="Dif. surtido total"
                                 value={number(dif.tickets)}
                                 subtitle="App vs reporte"
                                 icon={Store}

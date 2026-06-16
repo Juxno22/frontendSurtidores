@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FileSpreadsheet,
   Loader2,
@@ -40,7 +40,6 @@ function decimal(value) {
 const EMPTY_FORM = {
   fecha: todayLocal(),
   sucursal_id: '',
-  surtido: '',
   partidas: '',
   ceros: '',
   no_surtido: '',
@@ -51,6 +50,10 @@ function toNumber(value) {
   if (value === '' || value === null || value === undefined) return 0;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function calcularSurtidoTotal(form) {
+  return toNumber(form.partidas) + toNumber(form.ceros) + toNumber(form.no_surtido);
 }
 
 function Message({ type, children }) {
@@ -142,11 +145,22 @@ function ReporteManualForm({
           </label>
         </div>
 
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Field label="Surtido / Tickets" name="surtido" value={form.surtido} onChange={handleChange} />
-          <Field label="Partidas" name="partidas" value={form.partidas} onChange={handleChange} />
+        <div className="rounded-3xl bg-slate-950 p-4 text-white">
+          <p className="text-xs font-black uppercase tracking-widest text-white/50">
+            Surtido total calculado
+          </p>
+          <p className="mt-1 text-4xl font-black">
+            {number(calcularSurtidoTotal(form))}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-white/60">
+            Partidas surtidas + ceros + negados
+          </p>
+        </div>
+
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Field label="Partidas surtidas" name="partidas" value={form.partidas} onChange={handleChange} />
           <Field label="Ceros" name="ceros" value={form.ceros} onChange={handleChange} />
-          <Field label="No surtido / Negados" name="no_surtido" value={form.no_surtido} onChange={handleChange} />
+          <Field label="Negados" name="no_surtido" value={form.no_surtido} onChange={handleChange} />
           <Field label="% de surtido" name="porcentaje_surtido" value={form.porcentaje_surtido} onChange={handleChange} placeholder="98.5" />
         </div>
 
@@ -176,7 +190,7 @@ function ExcelImportPanel({
   return (
     <ReportPanel
       title="Importar Excel"
-      subtitle="Carga el reporte grupal con columnas FECHA, SUCURSAL, SURTIDO, PARTIDAS, CEROS, NO SURTIDO y % DE SURTIDO."
+      subtitle="Carga el reporte grupal con columnas FECHA, SUCURSAL, SURTIDO, PARTIDAS, CEROS, NEGADOS y % DE SURTIDO."
     >
       <div className="space-y-4">
         <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
@@ -278,9 +292,9 @@ function ReportesTable({ reportes, loading }) {
                 <th className="px-3 py-2">Fecha</th>
                 <th className="px-3 py-2">Sucursal</th>
                 <th className="px-3 py-2 text-right">Surtido</th>
-                <th className="px-3 py-2 text-right">Partidas</th>
+                <th className="px-3 py-2 text-right">Partidas surtidas</th>
                 <th className="px-3 py-2 text-right">Ceros</th>
-                <th className="px-3 py-2 text-right">No surtido</th>
+                <th className="px-3 py-2 text-right">Negados</th>
                 <th className="px-3 py-2 text-right">% surtido</th>
                 <th className="px-3 py-2">Fuente</th>
                 <th className="px-3 py-2">Estado</th>
@@ -411,7 +425,7 @@ export default function ReporteGrupalContent({ role = 'ADMIN' }) {
       await reporteGrupalApi.guardar({
         fecha: form.fecha,
         sucursal_id: Number(form.sucursal_id),
-        surtido: toNumber(form.surtido),
+        surtido: calcularSurtidoTotal(form),
         partidas: toNumber(form.partidas),
         ceros: toNumber(form.ceros),
         no_surtido: toNumber(form.no_surtido),
