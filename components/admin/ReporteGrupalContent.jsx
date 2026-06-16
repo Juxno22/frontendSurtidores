@@ -27,6 +27,17 @@ function todayLocal() {
   return `${year}-${month}-${day}`;
 }
 
+function addDays(dateString, days) {
+  const date = new Date(`${dateString}T12:00:00`);
+  date.setDate(date.getDate() + days);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 function number(value) {
   return new Intl.NumberFormat('es-MX').format(Number(value || 0));
 }
@@ -189,16 +200,16 @@ function ExcelImportPanel({
 
   return (
     <ReportPanel
-      title="Importar Excel"
-      subtitle="Carga el reporte grupal con columnas FECHA, SUCURSAL, SURTIDO, PARTIDAS, CEROS, NEGADOS y % DE SURTIDO."
+      title="Importar Excel acumulativo"
+      subtitle="Carga una o varias hojas/días. El sistema ignora DESCANSO, detecta fecha por hoja y calcula surtido total automáticamente."
     >
       <div className="space-y-4">
         <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 shrink-0 text-amber-500" size={18} />
             <p className="text-sm font-semibold text-slate-600">
-              Si el Excel no trae columna de fecha, puedes indicar una fecha general aquí.
-              Primero usa “Validar Excel” para revisar errores antes de importar.
+              Si el Excel trae varias hojas por día, se procesan todas. La fecha opcional sirve como respaldo
+              para hojas sin fecha clara o para inferir el mes cuando la hoja se llama 1, 2, 3, etc.
             </p>
           </div>
         </div>
@@ -255,12 +266,29 @@ function ExcelImportPanel({
               Validación correcta
             </div>
 
-            <p className="font-semibold">
-              Filas preparadas: {number(preview.total_preparadas || preview.total_importados || 0)}
-            </p>
+            <div className="grid gap-2 text-xs font-bold sm:grid-cols-2">
+              <p>
+                Registros preparados: {number(preview.total_preparadas || preview.total_importados || 0)}
+              </p>
+              <p>
+                Hojas procesadas: {number(preview.total_hojas_procesadas || preview.hojas_procesadas?.length || 0)}
+              </p>
+              <p>
+                Hojas ignoradas: {number(preview.total_hojas_ignoradas || preview.hojas_ignoradas?.length || 0)}
+              </p>
+              <p>
+                Rango: {preview.fecha_min || '-'} a {preview.fecha_max || '-'}
+              </p>
+            </div>
+
+            {preview.warnings?.length ? (
+              <p className="mt-2 rounded-2xl bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800">
+                Advertencias: {number(preview.warnings.length)}. Se importará usando surtido calculado.
+              </p>
+            ) : null}
 
             {preview.preview?.length ? (
-              <p className="mt-1 text-xs font-semibold">
+              <p className="mt-2 text-xs font-semibold">
                 Vista previa disponible en respuesta de API.
               </p>
             ) : null}
@@ -364,7 +392,9 @@ export default function ReporteGrupalContent({ role = 'ADMIN' }) {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const [filtros, setFiltros] = useState({
-    fecha: todayLocal(),
+    fecha: '',
+    desde: addDays(todayLocal(), -7),
+    hasta: todayLocal(),
     sucursal_id: ''
   });
 
@@ -400,6 +430,8 @@ export default function ReporteGrupalContent({ role = 'ADMIN' }) {
 
       const data = await reporteGrupalApi.listar({
         fecha: filtros.fecha,
+        desde: filtros.fecha ? '' : filtros.desde,
+        hasta: filtros.fecha ? '' : filtros.hasta,
         sucursal_id: filtros.sucursal_id
       });
 
@@ -490,8 +522,21 @@ export default function ReporteGrupalContent({ role = 'ADMIN' }) {
         dryRun: false
       });
 
-      showMessage('success', `Excel importado correctamente. Registros: ${number(data.total_importados)}.`);
-      await cargarReportes();
+      showMessage(
+        'success',
+        `Excel importado correctamente. Registros: ${number(data.total_importados)}. Hojas: ${number(data.total_hojas_procesadas || 0)}.`
+      );
+
+      if (data.fecha_min || data.fecha_max) {
+        setFiltros((prev) => ({
+          ...prev,
+          fecha: '',
+          desde: data.fecha_min || prev.desde,
+          hasta: data.fecha_max || prev.hasta
+        }));
+      } else {
+        await cargarReportes();
+      }
     } catch (error) {
       showMessage('error', error.message || 'No se pudo importar el Excel.');
     } finally {
@@ -509,7 +554,7 @@ export default function ReporteGrupalContent({ role = 'ADMIN' }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarReportes();
-  }, [filtros.fecha, filtros.sucursal_id]);
+  }, [filtros.fecha, filtros.desde, filtros.hasta, filtros.sucursal_id]);
 
   return (
     <AdminShell
@@ -545,15 +590,31 @@ export default function ReporteGrupalContent({ role = 'ADMIN' }) {
 
         <ReportPanel
           title="Filtros de consulta"
-          subtitle="Consulta reportes ya cargados."
+          subtitle="Consulta reportes ya cargados por fecha exacta o por rango."
         >
-          <div className="grid min-w-0 gap-3 sm:grid-cols-[0.8fr_1fr_auto]">
+          <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-[0.8fr_0.8fr_0.8fr_1fr_auto]">
             <Field
-              label="Fecha"
+              label="Fecha exacta"
               name="fecha_filtro"
               type="date"
               value={filtros.fecha}
               onChange={(e) => setFiltros((prev) => ({ ...prev, fecha: e.target.value }))}
+            />
+
+            <Field
+              label="Desde"
+              name="desde_filtro"
+              type="date"
+              value={filtros.desde}
+              onChange={(e) => setFiltros((prev) => ({ ...prev, fecha: '', desde: e.target.value }))}
+            />
+
+            <Field
+              label="Hasta"
+              name="hasta_filtro"
+              type="date"
+              value={filtros.hasta}
+              onChange={(e) => setFiltros((prev) => ({ ...prev, fecha: '', hasta: e.target.value }))}
             />
 
             <label className="min-w-0">
