@@ -18,6 +18,11 @@ import ReportPanel from './ReportPanel';
 import { productividadDetalleApi } from '@/lib/productividadDetalleApi';
 import { sucursalesApi, surtidoresApi } from '@/lib/productividadApi';
 
+import {
+  formatDurationHHMMSS,
+  formatHourMinute
+} from '@/lib/timeFormat';
+
 function todayLocal() {
   const date = new Date();
   const year = date.getFullYear();
@@ -29,16 +34,6 @@ function todayLocal() {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('es-MX');
-}
-
-function formatHours(value) {
-  return `${Number(value || 0).toFixed(2)} h`;
-}
-
-function formatTime(value) {
-  if (!value) return '-';
-
-  return String(value).slice(11, 16);
 }
 
 function KpiCard({ title, value, subtitle, icon: Icon, dark = false }) {
@@ -286,14 +281,14 @@ export default function ProductividadSurtidoresDetalleContent({ role = 'ADMIN' }
 
           <KpiCard
             title="Tiempo activo"
-            value={formatHours(resumen.tiempo_activo_horas)}
+            value={formatDurationHHMMSS(resumen.tiempo_activo_segundos)}
             subtitle="Inicio a fin del surtido"
             icon={Clock}
           />
 
           <KpiCard
             title="Tiempo muerto"
-            value={formatHours(resumen.tiempo_muerto_horas)}
+            value={formatDurationHHMMSS(resumen.tiempo_muerto_segundos)}
             subtitle="Entre surtido y surtido"
             icon={TimerReset}
           />
@@ -357,14 +352,14 @@ export default function ProductividadSurtidoresDetalleContent({ role = 'ADMIN' }
                     <div className="rounded-2xl bg-white px-3 py-2">
                       <p className="text-[10px] font-bold text-slate-400">Activo</p>
                       <p className="text-sm font-black text-slate-950">
-                        {formatHours(item.tiempo_activo_horas)}
+                        {formatDurationHHMMSS(item.tiempo_activo_segundos)}
                       </p>
                     </div>
 
                     <div className="rounded-2xl bg-white px-3 py-2">
                       <p className="text-[10px] font-bold text-slate-400">Muerto</p>
                       <p className="text-sm font-black text-slate-950">
-                        {formatHours(item.tiempo_muerto_horas)}
+                        {formatDurationHHMMSS(item.tiempo_muerto_segundos)}
                       </p>
                     </div>
                   </div>
@@ -405,16 +400,16 @@ export default function ProductividadSurtidoresDetalleContent({ role = 'ADMIN' }
                         {sesion.sucursal_nombre}
                       </td>
                       <td className="px-3 py-4 font-bold text-slate-700">
-                        {formatTime(sesion.hora_inicio)}
+                        {formatHourMinute(sesion.hora_inicio)}
                       </td>
                       <td className="px-3 py-4 font-bold text-slate-700">
-                        {formatTime(sesion.hora_fin)}
+                        {formatHourMinute(sesion.hora_fin)}
                       </td>
                       <td className="px-3 py-4 text-right font-black">
-                        {formatHours(sesion.duracion_laboral_horas)}
+                        {formatDurationHHMMSS(sesion.duracion_laboral_segundos)}
                       </td>
                       <td className="px-3 py-4 text-right font-black text-amber-700">
-                        {formatHours(sesion.tiempo_muerto_anterior_horas)}
+                        {formatDurationHHMMSS(sesion.tiempo_muerto_anterior_segundos)}
                       </td>
                       <td className="px-3 py-4 text-right font-black">
                         {formatNumber(sesion.surtido_total)}

@@ -23,6 +23,8 @@ import StatusBadge from './StatusBadge';
 import { dashboardApi } from '@/lib/dashboardApi';
 import { sucursalesApi } from '@/lib/productividadApi';
 
+import { formatDurationHHMMSS } from '@/lib/timeFormat';
+
 function todayLocal() {
     const date = new Date();
     const year = date.getFullYear();
@@ -568,8 +570,8 @@ function ProductividadJornadaPanel({ productividad }) {
                         />
                     </div>
                     <div className="mt-2 grid gap-1 text-xs font-bold text-slate-500 sm:grid-cols-3">
-                        <span>Activo: {decimal(resumen.tiempo_activo_laboral_horas)} h</span>
-                        <span>Muerto entre surtidos: {decimal(resumen.tiempo_muerto_operativo_horas ?? resumen.tiempo_muerto_laboral_horas)} h</span>
+                        <span>Activo: {formatDurationHHMMSS(resumen.tiempo_activo_laboral_segundos)}</span>
+                        <span>Muerto entre surtidos: {formatDurationHHMMSS(resumen.tiempo_muerto_operativo_segundos ?? resumen.tiempo_muerto_laboral_segundos)}</span>
                         <span>Jornada: {pct(aprovechamientoJornada)}</span>
                     </div>
                 </div>
@@ -777,7 +779,7 @@ export default function PowerBiDashboard({
 
                             <PowerBiCard
                                 title="Tiempo muerto"
-                                value={`${decimal(kpis.tiempo_muerto_operativo_horas ?? kpis.tiempo_muerto_laboral_horas)} h`}
+                                value={formatDurationHHMMSS(kpis.tiempo_muerto_operativo_segundos ?? kpis.tiempo_muerto_laboral_segundos)}
                                 subtitle="Entre fin de surtido e inicio del siguiente"
                                 icon={Clock}
                                 tone="default"
@@ -787,7 +789,7 @@ export default function PowerBiDashboard({
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             <PowerBiCard
                                 title="Tiempo activo"
-                                value={`${decimal(kpis.tiempo_activo_laboral_horas)} h`}
+                                value={formatDurationHHMMSS(kpis.tiempo_activo_laboral_segundos)}
                                 subtitle={`${decimal(kpis.partidas_por_hora_activa)} partidas/h activa`}
                                 icon={Warehouse}
                                 tone="soft"
