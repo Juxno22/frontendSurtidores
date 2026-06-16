@@ -53,6 +53,10 @@ function decimal(value) {
     }).format(Number(value || 0));
 }
 
+function pct(value) {
+    return `${decimal(value)}%`;
+}
+
 function surtidoTotal(row = {}) {
     return Number(row.surtido_total ?? row.tickets ?? 0);
 }
@@ -62,7 +66,7 @@ function partidasSurtidas(row = {}) {
 }
 
 function horasLaborales(row = {}) {
-    return Number(row.duracion_laboral_horas ?? row.duracion_horas ?? 0);
+    return Number(row.tiempo_activo_laboral_horas ?? row.duracion_laboral_horas ?? row.duracion_horas ?? 0);
 }
 
 function partidasPorHora(row = {}) {
@@ -288,7 +292,7 @@ function RankingSurtidores({ rows }) {
                 <EmptyPanel text="Sin surtidores con sesiones finalizadas en esta fecha." />
             ) : (
                 <div className="space-y-3">
-                    {rows.slice(0, 10).map((row) => (
+                    {rows.slice(0, 10).map((row, index) => (
                         <div
                             key={row.surtidor_id}
                             className="rounded-3xl border border-slate-200 bg-white p-4"
@@ -296,7 +300,7 @@ function RankingSurtidores({ rows }) {
                             <div className="mb-3 flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-black text-slate-950">
-                                        #{row.posicion} · {row.surtidor_nombre}
+                                        #{row.posicion || index + 1} · {row.surtidor_nombre}
                                     </p>
                                     <p className="text-xs font-semibold text-slate-500">
                                         Código: {row.surtidor_codigo || 'N/A'} · Sesiones: {number(row.sesiones_finalizadas)}
@@ -331,10 +335,22 @@ function RankingSurtidores({ rows }) {
                                 </div>
 
                                 <div className="rounded-2xl bg-slate-50 p-2">
-                                    <p className="font-bold text-slate-500">Horas</p>
+                                    <p className="font-bold text-slate-500">Horas activas</p>
                                     <p className="font-black text-slate-950">{decimal(horasLaborales(row))}</p>
                                 </div>
                             </div>
+
+                            {'cumplimiento_partidas_vs_esperado_pct' in row ? (
+                                <div className="mt-3 rounded-2xl bg-blue-50 p-3 text-xs ring-1 ring-blue-100">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="font-bold text-blue-700">Vs promedio equipo</span>
+                                        <span className="font-black text-blue-900">{pct(row.cumplimiento_partidas_vs_esperado_pct)}</span>
+                                    </div>
+                                    <p className="mt-1 font-semibold text-blue-700/80">
+                                        Esperado: {decimal(row.esperado_partidas_surtidas)} partidas · Dif: {decimal(row.diferencia_partidas_vs_esperado)}
+                                    </p>
+                                </div>
+                            ) : null}
                         </div>
                     ))}
                 </div>
@@ -484,6 +500,145 @@ function TendenciaPanel({ tendencia }) {
     );
 }
 
+
+function ProductividadJornadaPanel({ productividad }) {
+    const resumen = productividad?.resumen;
+
+    if (!resumen) {
+        return null;
+    }
+
+    const jornada = resumen.jornada || {};
+    const aprovechamiento = Number(resumen.aprovechamiento_turno_pct || 0);
+    const muertoPct = Math.max(0, 100 - aprovechamiento);
+
+    return (
+        <ReportPanel
+            title="Productividad por jornada"
+            subtitle="Aprovechamiento del turno laboral según horario Ciudad de México."
+        >
+            <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Jornada</p>
+                        <p className="mt-2 text-lg font-black text-slate-950">
+                            {jornada.es_laboral ? `${jornada.inicio} - ${jornada.fin}` : 'Descanso'}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                            Comida: {jornada.comida_inicio || '--'} - {jornada.comida_fin || '--'}
+                        </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Disponible equipo</p>
+                        <p className="mt-2 text-lg font-black text-slate-950">
+                            {decimal(jornada.jornada_disponible_equipo_horas)} h
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                            {number(resumen.surtidores_activos)} surtidores activos
+                        </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Promedio esperado</p>
+                        <p className="mt-2 text-lg font-black text-slate-950">
+                            {decimal(resumen.esperado_equipo?.partidas_surtidas_por_surtidor)} partidas
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                            Según reporte grupal / activos
+                        </p>
+                    </div>
+                </div>
+
+                <div>
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                        <span className="font-black text-slate-700">Aprovechamiento del turno</span>
+                        <span className="font-black text-slate-950">{pct(aprovechamiento)}</span>
+                    </div>
+                    <div className="h-4 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                            className="h-full rounded-full bg-[var(--color-primary)]"
+                            style={{ width: `${Math.min(100, aprovechamiento)}%` }}
+                        />
+                    </div>
+                    <div className="mt-2 flex justify-between gap-3 text-xs font-bold text-slate-500">
+                        <span>Activo: {decimal(resumen.tiempo_activo_laboral_horas)} h</span>
+                        <span>Muerto: {decimal(resumen.tiempo_muerto_laboral_horas)} h ({pct(muertoPct)})</span>
+                    </div>
+                </div>
+            </div>
+        </ReportPanel>
+    );
+}
+
+function HorasPicoPanel({ productividad }) {
+    const horasPico = productividad?.horas_pico;
+    const horasSurtido = horasPico?.horas_surtido || [];
+    const horasMuerto = horasPico?.horas_tiempo_muerto || [];
+    const maxPartidas = Math.max(...horasSurtido.map((row) => Number(row.partidas_surtidas || 0)), 0);
+    const maxMuerto = Math.max(...horasMuerto.map((row) => Number(row.tiempo_muerto_laboral_minutos || 0)), 0);
+
+    return (
+        <ReportPanel
+            title="Horas pico"
+            subtitle="Picos de surtido y de tiempo muerto dentro de jornada."
+        >
+            <div className="space-y-5">
+                <div>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-slate-700">Pico de surtido</p>
+                        <p className="text-sm font-black text-slate-950">
+                            {horasPico?.pico_surtido?.hora || '--'}
+                        </p>
+                    </div>
+
+                    {horasSurtido.length === 0 ? (
+                        <EmptyPanel text="Sin horas de surtido todavía." />
+                    ) : (
+                        <div className="space-y-3">
+                            {horasSurtido.slice(0, 8).map((row) => (
+                                <MiniBar
+                                    key={`surtido-${row.hora}`}
+                                    label={`${row.hora} · ${number(row.sesiones)} sesiones`}
+                                    value={row.partidas_surtidas}
+                                    max={maxPartidas}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-slate-700">Pico de tiempo muerto</p>
+                        <p className="text-sm font-black text-slate-950">
+                            {horasPico?.pico_tiempo_muerto?.hora || '--'}
+                        </p>
+                    </div>
+
+                    {horasMuerto.length === 0 ? (
+                        <div className="rounded-3xl bg-slate-50 p-4 text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+                            Sin espacios muertos entre sesiones todavía.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {horasMuerto.slice(0, 8).map((row) => (
+                                <MiniBar
+                                    key={`muerto-${row.hora}`}
+                                    label={row.hora}
+                                    value={row.tiempo_muerto_laboral_minutos}
+                                    max={maxMuerto}
+                                    suffix=" min"
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </ReportPanel>
+    );
+}
+
 export default function PowerBiDashboard({
     role = 'ADMIN',
     title = 'Dashboard ejecutivo',
@@ -498,6 +653,7 @@ export default function PowerBiDashboard({
     const [rankingSucursales, setRankingSucursales] = useState([]);
     const [pendientes, setPendientes] = useState(null);
     const [tendencia, setTendencia] = useState([]);
+    const [productividad, setProductividad] = useState(null);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -516,17 +672,12 @@ export default function PowerBiDashboard({
 
             const [
                 resumenRes,
-                rankingSurtidoresRes,
                 rankingSucursalesRes,
                 pendientesRes,
-                tendenciaRes
+                tendenciaRes,
+                productividadRes
             ] = await Promise.all([
                 dashboardApi.resumenDia(filtros),
-                dashboardApi.surtidoresRanking({
-                    ...filtros,
-                    orden: 'partidas_por_hora',
-                    limit: 20
-                }),
                 dashboardApi.sucursalesRanking({
                     ...filtros,
                     orden: 'partidas'
@@ -536,14 +687,16 @@ export default function PowerBiDashboard({
                     desde,
                     hasta: fecha,
                     sucursal_id: sucursalId
-                })
+                }),
+                dashboardApi.productividadJornada(filtros)
             ]);
 
             setResumen(resumenRes);
-            setRankingSurtidores(rankingSurtidoresRes.ranking || []);
+            setRankingSurtidores(productividadRes.surtidores || []);
             setRankingSucursales(rankingSucursalesRes.ranking || []);
             setPendientes(pendientesRes);
             setTendencia(tendenciaRes.tendencia || []);
+            setProductividad(productividadRes);
         } catch (err) {
             setError(err.message || 'No se pudo cargar el dashboard.');
         } finally {
@@ -570,7 +723,7 @@ export default function PowerBiDashboard({
         cargarDashboard();
     }, [fecha, sucursalId]);
 
-    const kpis = resumen?.kpis || {};
+    const kpis = productividad?.resumen || resumen?.kpis || {};
     const dif = resumen?.comparativo?.diferencias || {};
 
     return (
@@ -608,23 +761,31 @@ export default function PowerBiDashboard({
                             />
 
                             <PowerBiCard
-                                title="Horas laborales"
-                                value={`${decimal(kpis.duracion_laboral_horas ?? kpis.duracion_horas)} h`}
-                                subtitle="Tiempo válido dentro de jornada"
+                                title="Aprovechamiento"
+                                value={pct(kpis.aprovechamiento_turno_pct)}
+                                subtitle="Activo laboral / jornada disponible"
                                 icon={TrendingUp}
                                 tone="blue"
                             />
 
                             <PowerBiCard
-                                title="Tiempo real"
-                                value={`${decimal(kpis.duracion_horas)} h`}
-                                subtitle={`${number(kpis.surtidores_con_captura)} surtidores con captura`}
+                                title="Tiempo muerto"
+                                value={`${decimal(kpis.tiempo_muerto_laboral_horas)} h`}
+                                subtitle="Dentro de jornada laboral"
                                 icon={Clock}
                                 tone="default"
                             />
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <PowerBiCard
+                                title="Partidas/h activa"
+                                value={decimal(kpis.partidas_por_hora_activa)}
+                                subtitle={`${decimal(kpis.tiempo_activo_laboral_horas)} h activas`}
+                                icon={Warehouse}
+                                tone="soft"
+                            />
+
                             <PowerBiCard
                                 title="Ceros"
                                 value={number(kpis.ceros)}
@@ -635,28 +796,22 @@ export default function PowerBiDashboard({
 
                             <PowerBiCard
                                 title="Negados"
-                                value={number(kpis.no_surtido)}
+                                value={number(kpis.negados ?? kpis.no_surtido)}
                                 subtitle="Mismo campo operativo"
                                 icon={FileWarning}
                                 tone="soft"
                             />
 
                             <PowerBiCard
-                                title="Dif. surtido total"
-                                value={number(dif.tickets)}
-                                subtitle="App vs reporte"
-                                icon={Store}
-                                tone={Number(dif.tickets || 0) === 0 ? 'soft' : 'red'}
-                            />
-
-                            <PowerBiCard
                                 title="Dif. partidas"
                                 value={number(dif.partidas)}
                                 subtitle="App vs reporte"
-                                icon={Warehouse}
+                                icon={Store}
                                 tone={Number(dif.partidas || 0) === 0 ? 'soft' : 'red'}
                             />
                         </div>
+
+                        <ProductividadJornadaPanel productividad={productividad} />
 
                         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                             <div className="min-w-0">
@@ -680,8 +835,11 @@ export default function PowerBiDashboard({
 
                         <div className="grid gap-4 xl:grid-cols-[1fr_0.8fr_0.8fr]">
                             <RankingSurtidores rows={rankingSurtidores} />
-                            <PendientesPanel pendientes={pendientes} />
-                            <TendenciaPanel tendencia={tendencia} />
+                            <HorasPicoPanel productividad={productividad} />
+                            <div className="space-y-4">
+                                <PendientesPanel pendientes={pendientes} />
+                                <TendenciaPanel tendencia={tendencia} />
+                            </div>
                         </div>
 
                         <div className="flex flex-wrap gap-3">
