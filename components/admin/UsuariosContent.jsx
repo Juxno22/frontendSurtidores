@@ -24,7 +24,7 @@ const EMPTY_FORM = {
   nombre: '',
   usuario: '',
   password: '',
-  rol: 'SUPERVISOR',
+  rol: 'OPERATIVO',
   sucursal_id: '',
   activo: 1
 };
@@ -72,15 +72,18 @@ function EstadoBadge({ activo }) {
 }
 
 function RolBadge({ rol }) {
-  const isAdmin = rol === 'ADMIN';
+  const styles = {
+    ADMIN: 'bg-slate-950 text-white ring-slate-900',
+    SUPERVISOR: 'bg-blue-50 text-blue-700 ring-blue-200',
+    SURTIDOR: 'bg-red-50 text-red-700 ring-red-200',
+    OPERATIVO: 'bg-amber-50 text-amber-700 ring-amber-200'
+  };
 
   return (
     <span
       className={[
         'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ring-1',
-        isAdmin
-          ? 'bg-slate-950 text-white ring-slate-900'
-          : 'bg-blue-50 text-blue-700 ring-blue-200'
+        styles[rol] || styles.OPERATIVO
       ].join(' ')}
     >
       <ShieldCheck size={13} />
@@ -155,8 +158,8 @@ function UsuarioForm({
 
   return (
     <ReportPanel
-      title={selected ? 'Editar usuario' : 'Nuevo usuario administrativo'}
-      subtitle="Administra usuarios ADMIN y SUPERVISOR. Los surtidores se manejan en su catálogo."
+      title={selected ? 'Editar usuario' : 'Nuevo usuario'}
+      subtitle="Esta es la única sección para crear usuarios. Después se vinculan como surtidores o checadores desde sus catálogos."
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="grid min-w-0 gap-4 sm:grid-cols-2">
@@ -201,6 +204,8 @@ function UsuarioForm({
               onChange={handleChange}
               className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
             >
+              <option value="OPERATIVO">OPERATIVO</option>
+              <option value="SURTIDOR">SURTIDOR</option>
               <option value="SUPERVISOR">SUPERVISOR</option>
               <option value="ADMIN">ADMIN</option>
             </select>
@@ -328,6 +333,8 @@ function FiltrosUsuarios({
             <option value="">Todos</option>
             <option value="ADMIN">ADMIN</option>
             <option value="SUPERVISOR">SUPERVISOR</option>
+            <option value="SURTIDOR">SURTIDOR</option>
+            <option value="OPERATIVO">OPERATIVO</option>
           </select>
         </label>
 
@@ -438,8 +445,8 @@ function UsuariosTable({
 }) {
   return (
     <ReportPanel
-      title="Usuarios administrativos"
-      subtitle="Usuarios con acceso a panel administrador o supervisor."
+      title="Usuarios del sistema"
+      subtitle="Usuarios base. Las funciones de surtidor y checador se asignan desde sus catálogos."
       right={loading ? <Loader2 className="animate-spin text-slate-400" size={20} /> : null}
     >
       {usuarios.length === 0 ? (
@@ -553,6 +560,8 @@ export default function UsuariosContent() {
 
       if (item.rol === 'ADMIN') acc.admins += 1;
       if (item.rol === 'SUPERVISOR') acc.supervisores += 1;
+      if (item.rol === 'SURTIDOR') acc.surtidores += 1;
+      if (item.rol === 'OPERATIVO') acc.operativos += 1;
 
       if (Number(item.activo) === 1) acc.activos += 1;
       else acc.inactivos += 1;
@@ -562,6 +571,8 @@ export default function UsuariosContent() {
       total: 0,
       admins: 0,
       supervisores: 0,
+      surtidores: 0,
+      operativos: 0,
       activos: 0,
       inactivos: 0
     });
@@ -604,7 +615,7 @@ export default function UsuariosContent() {
       nombre: usuario.nombre || '',
       usuario: usuario.usuario || '',
       password: '',
-      rol: usuario.rol || 'SUPERVISOR',
+      rol: usuario.rol || 'OPERATIVO',
       sucursal_id: usuario.sucursal_id || '',
       activo: Number(usuario.activo) === 1 ? 1 : 0
     });
@@ -709,8 +720,8 @@ export default function UsuariosContent() {
   return (
     <AdminShell
       role="ADMIN"
-      title="Usuarios administrativos"
-      subtitle="Administra accesos ADMIN y SUPERVISOR para el sistema."
+      title="Usuarios"
+      subtitle="Alta centralizada de usuarios. Aquí se crean ADMIN, SUPERVISOR, SURTIDOR y OPERATIVO."
     >
       <div className="space-y-5">
         {message ? (
@@ -721,10 +732,10 @@ export default function UsuariosContent() {
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <MiniKpi label="Total" value={number(resumen.total)} icon={Users} />
-          <MiniKpi label="Admins" value={number(resumen.admins)} icon={ShieldCheck} />
-          <MiniKpi label="Supervisores" value={number(resumen.supervisores)} icon={UserPlus} />
-          <MiniKpi label="Activos" value={number(resumen.activos)} icon={CheckCircle2} />
-          <MiniKpi label="Inactivos" value={number(resumen.inactivos)} icon={XCircle} />
+          <MiniKpi label="ADMIN" value={number(resumen.admins)} icon={ShieldCheck} />
+          <MiniKpi label="SUPERVISOR" value={number(resumen.supervisores)} icon={UserPlus} />
+          <MiniKpi label="SURTIDOR" value={number(resumen.surtidores)} icon={CheckCircle2} />
+          <MiniKpi label="OPERATIVO" value={number(resumen.operativos)} icon={XCircle} />
         </div>
 
         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

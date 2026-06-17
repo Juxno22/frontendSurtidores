@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Store,
   Users,
+  UsersRound,
   UserCheck,
   Warehouse,
   Download,
@@ -35,6 +36,11 @@ const NAV_ADMIN = [
     label: 'Prod. checadores',
     href: '/admin/productividad/checadores',
     icon: UserCheck
+  },
+  {
+    label: 'Prod. integral',
+    href: '/admin/productividad/integral',
+    icon: UsersRound
   },
   {
     label: 'Exportaciones',
@@ -93,6 +99,11 @@ const NAV_SUPERVISOR = [
     label: 'Prod. checadores',
     href: '/supervisor/productividad/checadores',
     icon: UserCheck
+  },
+  {
+    label: 'Prod. integral',
+    href: '/supervisor/productividad/integral',
+    icon: UsersRound
   },
   {
     label: 'Sesiones',

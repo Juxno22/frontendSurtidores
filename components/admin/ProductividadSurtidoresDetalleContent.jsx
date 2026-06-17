@@ -36,6 +36,10 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('es-MX');
 }
 
+function formatHours(value) {
+  return `${Number(value || 0).toFixed(2)} h`;
+}
+
 function KpiCard({ title, value, subtitle, icon: Icon, dark = false }) {
   return (
     <div className={`rounded-3xl p-5 shadow-sm ring-1 ${
