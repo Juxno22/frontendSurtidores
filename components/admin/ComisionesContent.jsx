@@ -387,7 +387,7 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-xs font-black uppercase tracking-widest text-slate-400">
                         <th className="px-3 py-3">Usuario</th>
-                        <th className="px-3 py-3 text-right">Monto acumulado</th>
+                        <th className="px-3 py-3 text-right">Proceso bono</th>
                         <th className="px-3 py-3 text-right">Monto final</th>
                         <th className="px-3 py-3">Estado</th>
                         <th className="px-3 py-3">Métricas clave</th>
@@ -419,14 +419,14 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             {tipo === 'OPERATIVO_FUSIONADO' ? (
                               <>
                                 <p>Funciones: {(item.metricas?.tipos_comision || []).map(tipoLabel).join(' + ')}</p>
-                                <p>Acumulado real: {money(item.metricas?.monto_acumulado_componentes)}</p>
-                                <p>Tope aplicado: {money(item.metricas?.tope_usuario || 2000)}</p>
+                                <p>Peso por rubro: {money(item.metricas?.peso_por_rubro || 1000)}</p>
+                                <p>Tope bono: {money(item.metricas?.tope_usuario || 2000)}</p>
                               </>
                             ) : tipo === 'SURTIDOR_MAYOREO' ? (
                               <>
                                 <p>Partidas netas: {number(item.metricas?.partidas_netas)}</p>
-                                <p>Activo: {formatDurationHHMMSS(item.metricas?.tiempo_activo_segundos)}</p>
-                                <p>Partidas/h activa: {number(item.metricas?.partidas_netas_por_hora_activa)}</p>
+                                <p>Modo: {item.metricas?.modo_productividad === 'APP_TIEMPO_REAL' ? 'App' : 'Reporte/jornada'}</p>
+                                <p>Partidas/h cálculo: {number(item.metricas?.partidas_netas_por_hora_calculo)}</p>
                               </>
                             ) : tipo === 'CHECADOR_SUCURSAL' ? (
                               <>

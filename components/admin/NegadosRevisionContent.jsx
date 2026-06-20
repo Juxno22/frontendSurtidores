@@ -199,7 +199,7 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
     <AdminShell
       role={role}
       title="Negados"
-      subtitle="Revisión diaria de negados declarados por surtidores."
+      subtitle="Revisión diaria de negados declarados por surtidores o cargados desde reportes."
     >
       <div className="space-y-5">
         {message ? <Message type={message.type}>{message.text}</Message> : null}
@@ -312,8 +312,8 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
         </div>
 
         <ReportPanel
-          title="Negados declarados"
-          subtitle="Validar correcto = no penaliza. Rechazar = penaliza."
+          title="Negados por revisar"
+          subtitle="Incluye negados declarados en app y negados cargados desde reportes de mayoreo."
         >
           <div className="overflow-x-auto">
             <table className="min-w-[1300px] w-full text-sm">
@@ -322,6 +322,7 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
                   <th className="px-3 py-3">Fecha</th>
                   <th className="px-3 py-3">Surtidor</th>
                   <th className="px-3 py-3">Tipo</th>
+                  <th className="px-3 py-3">Origen</th>
                   <th className="px-3 py-3">Producto</th>
                   <th className="px-3 py-3">Razón</th>
                   <th className="px-3 py-3">Línea</th>
@@ -342,7 +343,11 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
                       <p className="text-xs font-bold text-slate-500">{item.surtidor_usuario}</p>
                     </td>
                     <td className="px-3 py-4 font-black">{item.tipo_operacion}</td>
-                    <td className="px-3 py-4 font-black text-slate-950">{item.codigo_producto}</td>
+                    <td className="px-3 py-4 font-black text-slate-700">{item.origen === 'REPORTE_MAYOREO' ? 'Reporte' : 'App'}</td>
+                    <td className="px-3 py-4 font-black text-slate-950">
+                      <p>{item.codigo_producto}</p>
+                      <p className="text-xs font-bold text-slate-500">{item.producto || '-'}</p>
+                    </td>
                     <td className="px-3 py-4 font-bold text-slate-700">{item.razon_texto}</td>
                     <td className="px-3 py-4 font-bold text-slate-700">{item.linea}</td>
                     <td className="px-3 py-4 text-right font-black">{formatNumber(item.cantidad_negada)}</td>
@@ -376,7 +381,7 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
 
                 {!loading && data.negados.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-3 py-10 text-center text-sm font-bold text-slate-500">
+                    <td colSpan={12} className="px-3 py-10 text-center text-sm font-bold text-slate-500">
                       No hay negados con los filtros actuales.
                     </td>
                   </tr>
