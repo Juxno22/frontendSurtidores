@@ -89,6 +89,58 @@ function Kpi({ title, value, subtitle, icon: Icon, dark = false }) {
   );
 }
 
+function buildGroupKey(item) {
+  return [
+    item.codigo_producto || 'SIN_CODIGO',
+    item.linea || 'SIN_LINEA',
+    item.producto || 'SIN_PRODUCTO'
+  ].join('||');
+}
+
+function groupNegados(negados = []) {
+  const map = new Map();
+
+  negados.forEach((item) => {
+    const key = buildGroupKey(item);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        codigo_producto: item.codigo_producto || 'SIN CÓDIGO',
+        producto: item.producto || '-',
+        linea: item.linea || '-',
+        total_cantidad: 0,
+        total_registros: 0,
+        pendientes: 0,
+        penalizan: 0,
+        no_penalizan: 0,
+        duplicados: 0,
+        surtidores: new Set(),
+        fechas: new Set(),
+        items: []
+      });
+    }
+
+    const group = map.get(key);
+
+    group.total_cantidad += Number(item.cantidad_negada || 0);
+    group.total_registros += 1;
+    group.items.push(item);
+
+    if (item.surtidor_nombre) group.surtidores.add(item.surtidor_nombre);
+    if (item.fecha_operativa) group.fechas.add(item.fecha_operativa);
+
+    if (item.estado_revision === 'PENDIENTE_REVISION') group.pendientes += 1;
+    if (item.estado_revision === 'RECHAZADO_PENALIZA') group.penalizan += 1;
+    if (item.estado_revision === 'VALIDADO_NO_PENALIZA') group.no_penalizan += 1;
+    if (item.estado_revision === 'CANCELADO_DUPLICADO') group.duplicados += 1;
+  });
+
+  return [...map.values()].sort((a, b) => {
+    return b.pendientes - a.pendientes || b.total_cantidad - a.total_cantidad || a.codigo_producto.localeCompare(b.codigo_producto);
+  });
+}
+
 export default function NegadosRevisionContent({ role = 'ADMIN' }) {
   const [filtros, setFiltros] = useState({
     desde: todayLocal(),
@@ -125,7 +177,7 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
 
       const response = await negadosApi.listar({
         ...filtros,
-        limit: 1000
+        limit: 2000
       });
 
       setData({
@@ -195,6 +247,8 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
     return base;
   }, [data.resumen]);
 
+  const gruposNegados = useMemo(() => groupNegados(data.negados), [data.negados]);
+
   return (
     <AdminShell
       role={role}
@@ -206,7 +260,7 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
 
         <ReportPanel
           title="Filtros"
-          subtitle="Los pendientes bloquean el cierre de comisión hasta ser revisados."
+          subtitle="Los pendientes bloquean el cierre de comisión hasta ser revisados. La vista agrupa por código, pero cada registro se responde individualmente."
           right={
             <button
               type="button"
@@ -312,82 +366,121 @@ export default function NegadosRevisionContent({ role = 'ADMIN' }) {
         </div>
 
         <ReportPanel
-          title="Negados por revisar"
-          subtitle="Incluye negados declarados en app y negados cargados desde reportes de mayoreo."
+          title="Negados agrupados por código"
+          subtitle="El agrupado facilita la búsqueda; la decisión se toma por registro individual."
         >
-          <div className="overflow-x-auto">
-            <table className="min-w-[1300px] w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs font-black uppercase tracking-widest text-slate-400">
-                  <th className="px-3 py-3">Fecha</th>
-                  <th className="px-3 py-3">Surtidor</th>
-                  <th className="px-3 py-3">Tipo</th>
-                  <th className="px-3 py-3">Origen</th>
-                  <th className="px-3 py-3">Producto</th>
-                  <th className="px-3 py-3">Razón</th>
-                  <th className="px-3 py-3">Línea</th>
-                  <th className="px-3 py-3 text-right">Cantidad</th>
-                  <th className="px-3 py-3">Estado</th>
-                  <th className="px-3 py-3">Comentario surtidor</th>
-                  <th className="px-3 py-3">Comentario supervisor</th>
-                  <th className="px-3 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
+          <div className="space-y-4">
+            {gruposNegados.map((grupo) => (
+              <details key={grupo.key} className="overflow-hidden rounded-3xl border border-slate-200 bg-white open:ring-2 open:ring-slate-100">
+                <summary className="cursor-pointer list-none p-5 transition hover:bg-slate-50">
+                  <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr] xl:items-center">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-400">Código producto</p>
+                      <p className="mt-1 text-xl font-black text-slate-950">{grupo.codigo_producto}</p>
+                      <p className="mt-1 text-sm font-bold text-slate-500">{grupo.producto}</p>
+                    </div>
 
-              <tbody>
-                {data.negados.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 align-top">
-                    <td className="px-3 py-4 font-black text-slate-950">{item.fecha_operativa}</td>
-                    <td className="px-3 py-4">
-                      <p className="font-black text-slate-950">{item.surtidor_nombre}</p>
-                      <p className="text-xs font-bold text-slate-500">{item.surtidor_usuario}</p>
-                    </td>
-                    <td className="px-3 py-4 font-black">{item.tipo_operacion}</td>
-                    <td className="px-3 py-4 font-black text-slate-700">{item.origen === 'REPORTE_MAYOREO' ? 'Reporte' : 'App'}</td>
-                    <td className="px-3 py-4 font-black text-slate-950">
-                      <p>{item.codigo_producto}</p>
-                      <p className="text-xs font-bold text-slate-500">{item.producto || '-'}</p>
-                    </td>
-                    <td className="px-3 py-4 font-bold text-slate-700">{item.razon_texto}</td>
-                    <td className="px-3 py-4 font-bold text-slate-700">{item.linea}</td>
-                    <td className="px-3 py-4 text-right font-black">{formatNumber(item.cantidad_negada)}</td>
-                    <td className="px-3 py-4"><EstadoBadge estado={item.estado_revision} /></td>
-                    <td className="max-w-[220px] px-3 py-4 text-xs font-semibold text-slate-600">{item.comentario_surtidor || '-'}</td>
-                    <td className="max-w-[220px] px-3 py-4 text-xs font-semibold text-slate-600">{item.comentario_supervisor || '-'}</td>
-                    <td className="px-3 py-4 text-right">
-                      {item.estado_revision === 'PENDIENTE_REVISION' ? (
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => revisar(item, 'VALIDADO_NO_PENALIZA')}
-                            className="rounded-xl bg-green-50 px-3 py-2 text-xs font-black text-green-700 ring-1 ring-green-200"
-                          >
-                            No penaliza
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => revisar(item, 'RECHAZADO_PENALIZA')}
-                            className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 ring-1 ring-red-200"
-                          >
-                            Penaliza
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs font-bold text-slate-400">Revisado</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-400">Línea</p>
+                      <p className="mt-1 text-sm font-black text-slate-950">{grupo.linea}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">{grupo.surtidores.size} surtidores involucrados</p>
+                    </div>
 
-                {!loading && data.negados.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="px-3 py-10 text-center text-sm font-bold text-slate-500">
-                      No hay negados con los filtros actuales.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-400">Cantidad</p>
+                      <p className="mt-1 text-2xl font-black text-slate-950">{formatNumber(grupo.total_cantidad)}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-400">Registros</p>
+                      <p className="mt-1 text-2xl font-black text-slate-950">{formatNumber(grupo.total_registros)}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-400">Pendientes</p>
+                      <p className={`mt-1 text-2xl font-black ${grupo.pendientes ? 'text-amber-600' : 'text-green-700'}`}>
+                        {formatNumber(grupo.pendientes)}
+                      </p>
+                    </div>
+                  </div>
+                </summary>
+
+                <div className="border-t border-slate-200 bg-slate-50 p-4">
+                  <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200">
+                    <table className="min-w-[1300px] w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-left text-xs font-black uppercase tracking-widest text-slate-400">
+                          <th className="px-3 py-3">Fecha</th>
+                          <th className="px-3 py-3">Surtidor</th>
+                          <th className="px-3 py-3">Tipo</th>
+                          <th className="px-3 py-3">Origen</th>
+                          <th className="px-3 py-3">Razón</th>
+                          <th className="px-3 py-3 text-right">Cantidad</th>
+                          <th className="px-3 py-3">Estado</th>
+                          <th className="px-3 py-3">Comentario surtidor</th>
+                          <th className="px-3 py-3">Comentario supervisor</th>
+                          <th className="px-3 py-3 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {grupo.items.map((item) => (
+                          <tr key={item.id} className="border-b border-slate-100 align-top">
+                            <td className="px-3 py-4 font-black text-slate-950">{item.fecha_operativa}</td>
+                            <td className="px-3 py-4">
+                              <p className="font-black text-slate-950">{item.surtidor_nombre}</p>
+                              <p className="text-xs font-bold text-slate-500">{item.surtidor_usuario}</p>
+                            </td>
+                            <td className="px-3 py-4 font-black">{item.tipo_operacion}</td>
+                            <td className="px-3 py-4 font-black text-slate-700">{item.origen === 'REPORTE_MAYOREO' ? 'Reporte' : 'App'}</td>
+                            <td className="px-3 py-4 font-bold text-slate-700">{item.razon_texto || '-'}</td>
+                            <td className="px-3 py-4 text-right font-black">{formatNumber(item.cantidad_negada)}</td>
+                            <td className="px-3 py-4"><EstadoBadge estado={item.estado_revision} /></td>
+                            <td className="max-w-[220px] px-3 py-4 text-xs font-semibold text-slate-600">{item.comentario_surtidor || '-'}</td>
+                            <td className="max-w-[220px] px-3 py-4 text-xs font-semibold text-slate-600">{item.comentario_supervisor || '-'}</td>
+                            <td className="px-3 py-4 text-right">
+                              {item.estado_revision === 'PENDIENTE_REVISION' ? (
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => revisar(item, 'VALIDADO_NO_PENALIZA')}
+                                    className="rounded-xl bg-green-50 px-3 py-2 text-xs font-black text-green-700 ring-1 ring-green-200"
+                                  >
+                                    No penaliza
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => revisar(item, 'RECHAZADO_PENALIZA')}
+                                    className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 ring-1 ring-red-200"
+                                  >
+                                    Penaliza
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => revisar(item, 'CANCELADO_DUPLICADO')}
+                                    className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 ring-1 ring-slate-200"
+                                  >
+                                    Duplicado
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-xs font-bold text-slate-400">Revisado</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+            ))}
+
+            {!loading && gruposNegados.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm font-bold text-slate-500">
+                No hay negados con los filtros actuales.
+              </div>
+            ) : null}
           </div>
         </ReportPanel>
       </div>

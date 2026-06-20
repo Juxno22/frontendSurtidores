@@ -17,7 +17,6 @@ import AdminShell from './AdminShell';
 import ReportPanel from './ReportPanel';
 import { comisionesApi } from '@/lib/comisionesApi';
 import { usuariosApi } from '@/lib/usuariosApi';
-import { formatDurationHHMMSS } from '@/lib/timeFormat';
 
 function todayLocal() {
   const date = new Date();
@@ -157,7 +156,7 @@ function IncidenciaForm({ usuarios, filtros, onSaved }) {
   return (
     <ReportPanel
       title="Incidencias operativas"
-      subtitle="Mal empaque, faltante/sobrante, asistencia, orden o puntualidad afectan el bloque correspondiente."
+      subtitle="Por defecto todos cumplen. Solo registra incidencias cuando quieras quitar un rubro; inasistencia injustificada o mal empaque bloquean el bono completo."
     >
       <form onSubmit={guardar} className="space-y-4">
         {message ? <Message type={message.type}>{message.text}</Message> : null}
@@ -387,7 +386,7 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-xs font-black uppercase tracking-widest text-slate-400">
                         <th className="px-3 py-3">Usuario</th>
-                        <th className="px-3 py-3 text-right">Proceso bono</th>
+                        <th className="px-3 py-3 text-right">Proceso del bono</th>
                         <th className="px-3 py-3 text-right">Monto final</th>
                         <th className="px-3 py-3">Estado</th>
                         <th className="px-3 py-3">Métricas clave</th>
@@ -401,7 +400,12 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             <p className="font-black text-slate-950">{item.usuario_nombre}</p>
                             <p className="text-xs font-bold text-slate-500">{item.usuario}</p>
                           </td>
-                          <td className="px-3 py-4 text-right font-black">{money(item.monto_acumulado)}</td>
+                          <td className="px-3 py-4 text-right font-black">
+                            {money(item.monto_acumulado)}
+                            {item.tipo_comision === 'OPERATIVO_FUSIONADO' ? (
+                              <p className="text-[11px] font-bold text-slate-400">tope {money(item.metricas?.tope_usuario || 2000)}</p>
+                            ) : null}
+                          </td>
                           <td className="px-3 py-4 text-right font-black">{money(item.monto_final)}</td>
                           <td className="px-3 py-4">
                             <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ring-1 ${
@@ -419,12 +423,17 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             {tipo === 'OPERATIVO_FUSIONADO' ? (
                               <>
                                 <p>Funciones: {(item.metricas?.tipos_comision || []).map(tipoLabel).join(' + ')}</p>
-                                <p>Peso por rubro: {money(item.metricas?.peso_por_rubro || 1000)}</p>
-                                <p>Tope bono: {money(item.metricas?.tope_usuario || 2000)}</p>
+                                <p>Máximo por función: {money(item.metricas?.peso_por_rubro || 1000)}</p>
+                                {(item.metricas?.componentes || []).map((component) => (
+                                  <p key={component.tipo_comision}>
+                                    {tipoLabel(component.tipo_comision)}: {money(component.aportacion_bono)}
+                                  </p>
+                                ))}
                               </>
                             ) : tipo === 'SURTIDOR_MAYOREO' ? (
                               <>
                                 <p>Partidas netas: {number(item.metricas?.partidas_netas)}</p>
+                                <p>Efectividad: {number(item.metricas?.efectividad_pct)}% · {item.metricas?.cumple_efectividad_minima ? 'cumple' : 'no cumple'}</p>
                                 <p>Modo: {item.metricas?.modo_productividad === 'APP_TIEMPO_REAL' ? 'App' : 'Reporte/jornada'}</p>
                                 <p>Partidas/h cálculo: {number(item.metricas?.partidas_netas_por_hora_calculo)}</p>
                               </>
@@ -443,7 +452,7 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             ) : (
                               <>
                                 <p>Partidas: {number(item.metricas?.partidas_surtidas)}</p>
-                                <p>Efectividad: {number(item.metricas?.efectividad_pct)}%</p>
+                                <p>Efectividad: {number(item.metricas?.efectividad_pct)}% · {item.metricas?.cumple_efectividad_minima ? 'cumple' : 'no cumple'}</p>
                                 <p>Negados penalizables: {number(item.metricas?.negados_penalizables)}</p>
                               </>
                             )}
