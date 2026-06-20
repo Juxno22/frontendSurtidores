@@ -21,6 +21,8 @@ import { usuariosApi } from '@/lib/usuariosApi';
 const EMPTY_FORM = {
   usuario_id: '',
   codigo: '',
+  codigo_reporte: '',
+  tipo_operacion: 'SUCURSAL',
   activo: 1
 };
 
@@ -62,6 +64,23 @@ function EstadoBadge({ activo }) {
     >
       {isActive ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
       {isActive ? 'Activo' : 'Inactivo'}
+    </span>
+  );
+}
+
+function TipoBadge({ tipo }) {
+  const isMayoreo = String(tipo || '').toUpperCase() === 'MAYOREO';
+
+  return (
+    <span
+      className={[
+        'inline-flex items-center rounded-full px-3 py-1 text-xs font-black ring-1',
+        isMayoreo
+          ? 'bg-blue-50 text-blue-700 ring-blue-200'
+          : 'bg-red-50 text-red-700 ring-red-200'
+      ].join(' ')}
+    >
+      {isMayoreo ? 'MAYOREO' : 'SUCURSAL'}
     </span>
   );
 }
@@ -136,15 +155,17 @@ function SurtidorForm({
         <div className="grid min-w-0 gap-4 sm:grid-cols-2">
           <label className="min-w-0">
             <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
-              Código surtidor
+              Tipo de operación
             </span>
-            <input
-              name="codigo"
-              value={form.codigo}
+            <select
+              name="tipo_operacion"
+              value={form.tipo_operacion}
               onChange={handleChange}
-              placeholder="Ej. S001"
               className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
-            />
+            >
+              <option value="SUCURSAL">SUCURSAL</option>
+              <option value="MAYOREO">MAYOREO</option>
+            </select>
           </label>
 
           <label className="min-w-0">
@@ -163,9 +184,43 @@ function SurtidorForm({
           </label>
         </div>
 
-        <div className="rounded-3xl bg-blue-50 p-4 text-sm font-bold text-blue-700 ring-1 ring-blue-200">
-          Para cambiar nombre, usuario, contraseña o rol, usa la sección Usuarios.
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <label className="min-w-0">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+              Código interno
+            </span>
+            <input
+              name="codigo"
+              value={form.codigo}
+              onChange={handleChange}
+              placeholder="Ej. S001"
+              className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
+            />
+          </label>
+
+          <label className="min-w-0">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+              Código de reporte
+            </span>
+            <input
+              name="codigo_reporte"
+              value={form.codigo_reporte}
+              onChange={handleChange}
+              placeholder="Ej. AJMN, JMMC, IEG"
+              className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
+            />
+          </label>
         </div>
+
+        <div className="rounded-3xl bg-blue-50 p-4 text-sm font-bold text-blue-700 ring-1 ring-blue-200">
+          El código de reporte se usará para cruzar archivos externos. Si lo dejas vacío al crear, se usará el usuario de acceso.
+        </div>
+
+        {selected && selected.tipo_operacion !== form.tipo_operacion ? (
+          <div className="rounded-3xl bg-amber-50 p-4 text-sm font-bold text-amber-700 ring-1 ring-amber-200">
+            Si este surtidor ya tiene sesiones registradas, el backend bloqueará el cambio de tipo para no mezclar historial de sucursal con mayoreo.
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
@@ -199,8 +254,8 @@ function FiltrosSurtidores({ filtros, setFiltros, onRefresh, loading }) {
   }
 
   return (
-    <ReportPanel title="Filtros" subtitle="Busca por nombre, usuario, rol o código.">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-[1fr_180px_auto]">
+    <ReportPanel title="Filtros" subtitle="Busca por nombre, usuario, rol, código o tipo de operación.">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[1fr_180px_180px_auto]">
         <label className="min-w-0">
           <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
             Búsqueda
@@ -215,6 +270,22 @@ function FiltrosSurtidores({ filtros, setFiltros, onRefresh, loading }) {
               className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
             />
           </div>
+        </label>
+
+        <label className="min-w-0">
+          <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+            Tipo
+          </span>
+          <select
+            name="tipo_operacion"
+            value={filtros.tipo_operacion}
+            onChange={handleChange}
+            className="block w-full min-w-0 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
+          >
+            <option value="">Todos</option>
+            <option value="SUCURSAL">Sucursal</option>
+            <option value="MAYOREO">Mayoreo</option>
+          </select>
         </label>
 
         <label className="min-w-0">
@@ -262,13 +333,14 @@ function SurtidoresTable({ surtidores, loading, onEdit }) {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full border-separate border-spacing-y-2 text-left text-sm">
+          <table className="min-w-[1100px] w-full border-separate border-spacing-y-2 text-left text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-widest text-slate-400">
                 <th className="px-3 py-2">Surtidor</th>
                 <th className="px-3 py-2">Usuario</th>
-                <th className="px-3 py-2">Rol</th>
-                <th className="px-3 py-2">Código</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Código interno</th>
+                <th className="px-3 py-2">Código reporte</th>
                 <th className="px-3 py-2">Estado</th>
                 <th className="px-3 py-2">Último login</th>
                 <th className="px-3 py-2">Acción</th>
@@ -282,9 +354,13 @@ function SurtidoresTable({ surtidores, loading, onEdit }) {
                     <p className="font-black text-slate-950">{surtidor.nombre}</p>
                     <p className="text-xs font-semibold text-slate-500">ID surtidor: {surtidor.id}</p>
                   </td>
-                  <td className="px-3 py-4 font-bold text-slate-700">{surtidor.usuario}</td>
-                  <td className="px-3 py-4 font-bold text-slate-700">{surtidor.rol}</td>
+                  <td className="px-3 py-4">
+                    <p className="font-bold text-slate-700">{surtidor.usuario}</p>
+                    <p className="text-xs font-semibold text-slate-500">{surtidor.rol}</p>
+                  </td>
+                  <td className="px-3 py-4"><TipoBadge tipo={surtidor.tipo_operacion} /></td>
                   <td className="px-3 py-4 font-bold text-slate-700">{surtidor.codigo || '-'}</td>
+                  <td className="px-3 py-4 font-bold text-slate-700">{surtidor.codigo_reporte || '-'}</td>
                   <td className="px-3 py-4"><EstadoBadge activo={surtidor.activo} /></td>
                   <td className="px-3 py-4 text-xs font-semibold text-slate-500">{formatDateTime(surtidor.ultimo_login)}</td>
                   <td className="rounded-r-2xl px-3 py-4">
@@ -312,7 +388,7 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
   const [usuariosDisponibles, setUsuariosDisponibles] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [selected, setSelected] = useState(null);
-  const [filtros, setFiltros] = useState({ search: '', activo: '' });
+  const [filtros, setFiltros] = useState({ search: '', activo: '', tipo_operacion: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -321,8 +397,10 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
     acc.total += 1;
     if (Number(item.activo) === 1) acc.activos += 1;
     else acc.inactivos += 1;
+    if (item.tipo_operacion === 'MAYOREO') acc.mayoreo += 1;
+    else acc.sucursal += 1;
     return acc;
-  }, { total: 0, activos: 0, inactivos: 0 }), [surtidores]);
+  }, { total: 0, activos: 0, inactivos: 0, sucursal: 0, mayoreo: 0 }), [surtidores]);
 
   function showMessage(type, text) {
     setMessage({ type, text });
@@ -352,7 +430,13 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
 
   function handleEdit(surtidor) {
     setSelected(surtidor);
-    setForm({ usuario_id: surtidor.usuario_id || '', codigo: surtidor.codigo || '', activo: Number(surtidor.activo) === 1 ? 1 : 0 });
+    setForm({
+      usuario_id: surtidor.usuario_id || '',
+      codigo: surtidor.codigo || '',
+      codigo_reporte: surtidor.codigo_reporte || '',
+      tipo_operacion: surtidor.tipo_operacion || 'SUCURSAL',
+      activo: Number(surtidor.activo) === 1 ? 1 : 0
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -372,17 +456,20 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
     try {
       setSaving(true);
 
+      const payload = {
+        codigo: form.codigo.trim() || null,
+        codigo_reporte: form.codigo_reporte.trim() || null,
+        tipo_operacion: form.tipo_operacion,
+        activo: Number(form.activo) === 1 ? 1 : 0
+      };
+
       if (selected) {
-        await surtidoresApi.actualizar(selected.id, {
-          codigo: form.codigo.trim() || null,
-          activo: Number(form.activo) === 1 ? 1 : 0
-        });
+        await surtidoresApi.actualizar(selected.id, payload);
         showMessage('success', 'Surtidor actualizado correctamente.');
       } else {
         await surtidoresApi.crear({
-          usuario_id: Number(form.usuario_id),
-          codigo: form.codigo.trim() || null,
-          activo: Number(form.activo) === 1 ? 1 : 0
+          ...payload,
+          usuario_id: Number(form.usuario_id)
         });
         showMessage('success', 'Usuario vinculado como surtidor correctamente.');
       }
@@ -406,7 +493,7 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarSurtidores();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtros.activo]);
+  }, [filtros.activo, filtros.tipo_operacion]);
 
   const title = role === 'ADMIN' ? 'Catálogo de surtidores' : 'Surtidores';
 
@@ -419,9 +506,11 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
       <div className="space-y-5">
         {message ? <Message type={message.type}>{message.text}</Message> : null}
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <MiniKpi label="Total" value={number(resumen.total)} icon={Warehouse} />
           <MiniKpi label="Activos" value={number(resumen.activos)} icon={CheckCircle2} />
+          <MiniKpi label="Sucursal" value={number(resumen.sucursal)} icon={Warehouse} />
+          <MiniKpi label="Mayoreo" value={number(resumen.mayoreo)} icon={Warehouse} />
           <MiniKpi label="Disponibles" value={number(usuariosDisponibles.length)} icon={UserPlus} />
         </div>
 
@@ -439,7 +528,13 @@ export default function SurtidoresContent({ role = 'ADMIN' }) {
           </div>
 
           <div className="min-w-0 space-y-4">
-            <FiltrosSurtidores filtros={filtros} setFiltros={setFiltros} onRefresh={cargarSurtidores} loading={loading} />
+            <FiltrosSurtidores
+              filtros={filtros}
+              setFiltros={setFiltros}
+              onRefresh={cargarSurtidores}
+              loading={loading}
+            />
+
             <SurtidoresTable surtidores={surtidores} loading={loading} onEdit={handleEdit} />
           </div>
         </div>

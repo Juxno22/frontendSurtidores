@@ -26,7 +26,11 @@ const EMPTY_FORM = {
   password: '',
   rol: 'OPERATIVO',
   sucursal_id: '',
-  activo: 1
+  activo: 1,
+  es_encargado: 0,
+  encargado_surtidores_sucursal: 0,
+  encargado_checadores_sucursal: 0,
+  encargado_surtidores_mayoreo: 0
 };
 
 function number(value) {
@@ -156,6 +160,15 @@ function UsuarioForm({
     }));
   }
 
+  function handleCheck(e) {
+    const { name, checked } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: checked ? 1 : 0
+    }));
+  }
+
   return (
     <ReportPanel
       title={selected ? 'Editar usuario' : 'Nuevo usuario'}
@@ -249,6 +262,61 @@ function UsuarioForm({
               <option value={0}>Inactivo</option>
             </select>
           </label>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-4">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="es_encargado"
+              checked={Number(form.es_encargado) === 1}
+              onChange={handleCheck}
+              className="mt-1 h-4 w-4 rounded border-slate-300"
+            />
+            <span>
+              <span className="block text-sm font-black text-slate-950">Usuario encargado</span>
+              <span className="block text-xs font-bold text-slate-500">
+                Campo base para futuras comisiones de encargado. No cambia permisos de acceso.
+              </span>
+            </span>
+          </label>
+
+          {Number(form.es_encargado) === 1 ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  name="encargado_surtidores_sucursal"
+                  checked={Number(form.encargado_surtidores_sucursal) === 1}
+                  onChange={handleCheck}
+                  className="mr-2 h-4 w-4 rounded border-slate-300 align-middle"
+                />
+                Surtidores sucursal
+              </label>
+
+              <label className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  name="encargado_checadores_sucursal"
+                  checked={Number(form.encargado_checadores_sucursal) === 1}
+                  onChange={handleCheck}
+                  className="mr-2 h-4 w-4 rounded border-slate-300 align-middle"
+                />
+                Checadores sucursal
+              </label>
+
+              <label className="rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  name="encargado_surtidores_mayoreo"
+                  checked={Number(form.encargado_surtidores_mayoreo) === 1}
+                  onChange={handleCheck}
+                  className="mr-2 h-4 w-4 rounded border-slate-300 align-middle"
+                />
+                Surtidores mayoreo
+              </label>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-3xl bg-amber-50 p-4 text-sm font-bold text-amber-700 ring-1 ring-amber-200">
@@ -457,12 +525,13 @@ function UsuariosTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-[980px] w-full border-separate border-spacing-y-2 text-left text-sm">
+          <table className="min-w-[1180px] w-full border-separate border-spacing-y-2 text-left text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-widest text-slate-400">
                 <th className="px-3 py-2">Usuario</th>
                 <th className="px-3 py-2">Acceso</th>
                 <th className="px-3 py-2">Rol</th>
+                <th className="px-3 py-2">Encargado</th>
                 <th className="px-3 py-2">Sucursal</th>
                 <th className="px-3 py-2">Estado</th>
                 <th className="px-3 py-2">Último login</th>
@@ -489,6 +558,25 @@ function UsuariosTable({
 
                   <td className="px-3 py-4">
                     <RolBadge rol={usuario.rol} />
+                  </td>
+
+                  <td className="px-3 py-4">
+                    {Number(usuario.es_encargado) === 1 ? (
+                      <div className="space-y-1 text-xs font-black">
+                        <span className="inline-flex rounded-full bg-purple-50 px-3 py-1 text-purple-700 ring-1 ring-purple-200">
+                          Encargado
+                        </span>
+                        <p className="text-slate-500">
+                          {[
+                            Number(usuario.encargado_surtidores_sucursal) === 1 ? 'Surt. sucursal' : null,
+                            Number(usuario.encargado_checadores_sucursal) === 1 ? 'Checadores' : null,
+                            Number(usuario.encargado_surtidores_mayoreo) === 1 ? 'Surt. mayoreo' : null
+                          ].filter(Boolean).join(' · ') || 'Sin área'}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-bold text-slate-400">No</span>
+                    )}
                   </td>
 
                   <td className="px-3 py-4 font-bold text-slate-700">
@@ -566,6 +654,8 @@ export default function UsuariosContent() {
       if (Number(item.activo) === 1) acc.activos += 1;
       else acc.inactivos += 1;
 
+      if (Number(item.es_encargado) === 1) acc.encargados += 1;
+
       return acc;
     }, {
       total: 0,
@@ -573,6 +663,7 @@ export default function UsuariosContent() {
       supervisores: 0,
       surtidores: 0,
       operativos: 0,
+      encargados: 0,
       activos: 0,
       inactivos: 0
     });
@@ -617,7 +708,11 @@ export default function UsuariosContent() {
       password: '',
       rol: usuario.rol || 'OPERATIVO',
       sucursal_id: usuario.sucursal_id || '',
-      activo: Number(usuario.activo) === 1 ? 1 : 0
+      activo: Number(usuario.activo) === 1 ? 1 : 0,
+      es_encargado: Number(usuario.es_encargado) === 1 ? 1 : 0,
+      encargado_surtidores_sucursal: Number(usuario.encargado_surtidores_sucursal) === 1 ? 1 : 0,
+      encargado_checadores_sucursal: Number(usuario.encargado_checadores_sucursal) === 1 ? 1 : 0,
+      encargado_surtidores_mayoreo: Number(usuario.encargado_surtidores_mayoreo) === 1 ? 1 : 0
     });
 
     window.scrollTo({
@@ -652,7 +747,11 @@ export default function UsuariosContent() {
         usuario: form.usuario.trim(),
         rol: form.rol,
         sucursal_id: form.sucursal_id ? Number(form.sucursal_id) : null,
-        activo: Number(form.activo) === 1 ? 1 : 0
+        activo: Number(form.activo) === 1 ? 1 : 0,
+        es_encargado: Number(form.es_encargado) === 1 ? 1 : 0,
+        encargado_surtidores_sucursal: Number(form.encargado_surtidores_sucursal) === 1 ? 1 : 0,
+        encargado_checadores_sucursal: Number(form.encargado_checadores_sucursal) === 1 ? 1 : 0,
+        encargado_surtidores_mayoreo: Number(form.encargado_surtidores_mayoreo) === 1 ? 1 : 0
       };
 
       if (form.password) {
@@ -730,12 +829,13 @@ export default function UsuariosContent() {
           </Message>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <MiniKpi label="Total" value={number(resumen.total)} icon={Users} />
           <MiniKpi label="ADMIN" value={number(resumen.admins)} icon={ShieldCheck} />
           <MiniKpi label="SUPERVISOR" value={number(resumen.supervisores)} icon={UserPlus} />
           <MiniKpi label="SURTIDOR" value={number(resumen.surtidores)} icon={CheckCircle2} />
           <MiniKpi label="OPERATIVO" value={number(resumen.operativos)} icon={XCircle} />
+          <MiniKpi label="ENCARGADOS" value={number(resumen.encargados)} icon={ShieldCheck} />
         </div>
 
         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

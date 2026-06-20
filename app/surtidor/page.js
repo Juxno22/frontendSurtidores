@@ -7,10 +7,12 @@ import {
   Loader2,
   PackageCheck,
   Play,
+  PlusCircle,
   RotateCcw,
   Save,
   Square,
   Store,
+  Trash2,
   XCircle
 } from 'lucide-react';
 
@@ -18,6 +20,7 @@ import UserAccountMenu from '@/components/UserAccountMenu';
 import AuthGuard from '@/components/AuthGuard';
 import { getUser } from '@/lib/auth';
 import { sesionesApi, sucursalesApi } from '@/lib/productividadApi';
+import { negadosApi } from '@/lib/negadosApi';
 import {
   deleteSessionDraft,
   getDraftKeyBySessionId,
@@ -31,6 +34,24 @@ const EMPTY_FORM = {
   negados: '',
   observaciones: ''
 };
+
+const EMPTY_NEGADO = {
+  codigo_producto: '',
+  razon_codigo: 'NO_ENCONTRADO_UBICACION',
+  linea: '',
+  cantidad_negada: '1',
+  comentario_surtidor: ''
+};
+
+const DEFAULT_MOTIVOS_NEGADO = [
+  { codigo: 'NO_ENCONTRADO_UBICACION', nombre: 'No encontrado en ubicación' },
+  { codigo: 'MAL_UBICADO', nombre: 'Mal ubicado' },
+  { codigo: 'INVENTARIO_INCORRECTO', nombre: 'Inventario incorrecto' },
+  { codigo: 'PRODUCTO_DANADO', nombre: 'Producto dañado' },
+  { codigo: 'CODIGO_DESCONTINUADO', nombre: 'Código descontinuado / no manejado' },
+  { codigo: 'DIFERENCIA_SISTEMA', nombre: 'Diferencia de sistema' },
+  { codigo: 'OTRO', nombre: 'Otro' }
+];
 
 function numberOrZero(value) {
   if (value === '' || value === null || value === undefined) return 0;
@@ -57,11 +78,33 @@ function secondsToClock(seconds) {
   ].join(':');
 }
 
-function getSurtidoTotal(form) {
+function normalizeNegadosDetalle(items = []) {
+  return items
+    .map((item) => ({
+      codigo_producto: String(item.codigo_producto || '').trim().toUpperCase().replace(/\s+/g, ''),
+      razon_codigo: String(item.razon_codigo || item.razon || '').trim().toUpperCase(),
+      linea: String(item.linea || '').trim(),
+      cantidad_negada: numberOrZero(item.cantidad_negada ?? item.cantidad),
+      comentario_surtidor: String(item.comentario_surtidor || item.comentario || '').trim()
+    }))
+    .filter((item) => (
+      item.codigo_producto ||
+      item.razon_codigo ||
+      item.linea ||
+      item.cantidad_negada ||
+      item.comentario_surtidor
+    ));
+}
+
+function getNegadosCantidadTotal(items = []) {
+  return normalizeNegadosDetalle(items).reduce((acc, item) => acc + numberOrZero(item.cantidad_negada), 0);
+}
+
+function getSurtidoTotal(form, negadosDetalle = []) {
   return (
     numberOrZero(form.partidas_surtidas) +
     numberOrZero(form.ceros) +
-    numberOrZero(form.negados)
+    getNegadosCantidadTotal(negadosDetalle)
   );
 }
 
@@ -74,10 +117,27 @@ function getFormFromSesionOrDraft(source = {}) {
   };
 }
 
-function buildPayload(form) {
+function getNegadosFromSesionOrDraft(source = {}) {
+  const raw = Array.isArray(source.negados_detalle)
+    ? source.negados_detalle
+    : Array.isArray(source.negados_declarados)
+      ? source.negados_declarados
+      : [];
+
+  return raw.map((item) => ({
+    codigo_producto: item.codigo_producto || '',
+    razon_codigo: item.razon_codigo || item.razon || 'NO_ENCONTRADO_UBICACION',
+    linea: item.linea || '',
+    cantidad_negada: item.cantidad_negada ?? item.cantidad ?? '1',
+    comentario_surtidor: item.comentario_surtidor || item.comentario || ''
+  }));
+}
+
+function buildPayload(form, negadosDetalle = []) {
   const partidasSurtidas = numberOrZero(form.partidas_surtidas);
   const ceros = numberOrZero(form.ceros);
-  const negados = numberOrZero(form.negados);
+  const detalleNormalizado = normalizeNegadosDetalle(negadosDetalle);
+  const negados = detalleNormalizado.reduce((acc, item) => acc + numberOrZero(item.cantidad_negada), 0);
   const surtidoTotal = partidasSurtidas + ceros + negados;
 
   return {
@@ -91,10 +151,37 @@ function buildPayload(form) {
 
     negados,
     no_surtido: negados,
+    negados_detalle: detalleNormalizado,
 
     monto: 0,
     observaciones: String(form.observaciones || '').trim()
   };
+}
+
+function validateNegadosDetalle(negadosDetalle = []) {
+  const detalle = normalizeNegadosDetalle(negadosDetalle);
+
+  for (let index = 0; index < detalle.length; index += 1) {
+    const item = detalle[index];
+
+    if (!item.codigo_producto) {
+      return `Captura el código del producto en el negado ${index + 1}.`;
+    }
+
+    if (!item.razon_codigo) {
+      return `Selecciona la razón del negado ${index + 1}.`;
+    }
+
+    if (!item.linea) {
+      return `Captura la línea del negado ${index + 1}.`;
+    }
+
+    if (numberOrZero(item.cantidad_negada) <= 0) {
+      return `La cantidad del negado ${index + 1} debe ser mayor a 0.`;
+    }
+  }
+
+  return '';
 }
 
 function Header({ user }) {
@@ -137,7 +224,7 @@ function StatusMessage({ type = 'info', children }) {
   );
 }
 
-function Field({ label, name, value, onChange, type = 'number', placeholder = '0' }) {
+function Field({ label, name, value, onChange, type = 'number', placeholder = '0', readOnly = false }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-bold text-slate-700">
@@ -153,9 +240,139 @@ function Field({ label, name, value, onChange, type = 'number', placeholder = '0
         step="1"
         inputMode={type === 'number' ? 'numeric' : undefined}
         placeholder={placeholder}
-        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
+        readOnly={readOnly}
+        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100 read-only:bg-slate-100 read-only:text-slate-500"
       />
     </label>
+  );
+}
+
+function NegadosDeclaradosPanel({
+  negadosDetalle,
+  motivos,
+  onAdd,
+  onRemove,
+  onChange
+}) {
+  return (
+    <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h4 className="text-base font-black text-amber-950">
+            Negados declarados
+          </h4>
+          <p className="mt-1 text-xs font-semibold text-amber-700">
+            Captura código, razón, línea y cantidad. El supervisor los revisará diario.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-amber-600 px-3 py-2 text-xs font-black text-white shadow-sm active:scale-[0.99]"
+        >
+          <PlusCircle size={16} />
+          Agregar
+        </button>
+      </div>
+
+      {negadosDetalle.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-white/70 px-4 py-4 text-sm font-bold text-amber-700">
+          Sin negados declarados. Si no agregas registros, el total de negados será 0.
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {negadosDetalle.map((item, index) => (
+            <div key={`${index}-${item.codigo_producto}`} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-amber-200">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-xs font-black uppercase tracking-widest text-amber-600">
+                  Negado {index + 1}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 ring-1 ring-red-200"
+                >
+                  <Trash2 size={14} />
+                  Quitar
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label>
+                  <span className="mb-1 block text-xs font-black uppercase tracking-widest text-slate-400">
+                    Código producto
+                  </span>
+                  <input
+                    value={item.codigo_producto}
+                    onChange={(e) => onChange(index, 'codigo_producto', e.target.value)}
+                    placeholder="Ej. MK6335"
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-black uppercase tracking-widest text-slate-400">
+                    Razón
+                  </span>
+                  <select
+                    value={item.razon_codigo}
+                    onChange={(e) => onChange(index, 'razon_codigo', e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                  >
+                    {motivos.map((motivo) => (
+                      <option key={motivo.codigo} value={motivo.codigo}>
+                        {motivo.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-black uppercase tracking-widest text-slate-400">
+                    Línea
+                  </span>
+                  <input
+                    value={item.linea}
+                    onChange={(e) => onChange(index, 'linea', e.target.value)}
+                    placeholder="Ej. GRÖB / línea producto"
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-xs font-black uppercase tracking-widest text-slate-400">
+                    Cantidad negada
+                  </span>
+                  <input
+                    value={item.cantidad_negada}
+                    onChange={(e) => onChange(index, 'cantidad_negada', e.target.value)}
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                  />
+                </label>
+              </div>
+
+              <label className="mt-3 block">
+                <span className="mb-1 block text-xs font-black uppercase tracking-widest text-slate-400">
+                  Comentario opcional
+                </span>
+                <input
+                  value={item.comentario_surtidor}
+                  onChange={(e) => onChange(index, 'comentario_surtidor', e.target.value)}
+                  placeholder="Detalle opcional para supervisor"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -163,9 +380,13 @@ function StartSessionView({
   sucursales,
   sucursalId,
   setSucursalId,
+  surtidorPerfil,
   onStart,
   loading
 }) {
+  const tipoOperacion = surtidorPerfil?.tipo_operacion || 'SUCURSAL';
+  const esMayoreo = tipoOperacion === 'MAYOREO';
+
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
       <div className="mb-5 flex items-start gap-3">
@@ -175,38 +396,58 @@ function StartSessionView({
 
         <div>
           <h2 className="text-xl font-black text-slate-950">
-            Iniciar surtido
+            {esMayoreo ? 'Iniciar surtido mayoreo' : 'Iniciar surtido sucursal'}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Selecciona la sucursal que vas a surtir. El tiempo oficial lo toma el servidor con horario de Ciudad de México.
+            {esMayoreo
+              ? 'Mayoreo usa jornada 17:00 a 02:00, con comida de 22:00 a 23:00. El tiempo oficial lo toma el servidor.'
+              : 'Selecciona la sucursal que vas a surtir. El tiempo oficial lo toma el servidor con horario de Ciudad de México.'}
           </p>
         </div>
       </div>
 
-      <label className="block">
-        <span className="mb-2 block text-sm font-bold text-slate-700">
-          Sucursal surtida
-        </span>
+      <div className="mb-5 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
+        <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+          Perfil operativo
+        </p>
+        <p className="mt-1 text-lg font-black text-slate-950">
+          {esMayoreo ? 'Mayoreo' : 'Sucursales'}
+        </p>
+        <p className="mt-1 text-xs font-bold text-slate-500">
+          Código reporte: {surtidorPerfil?.codigo_reporte || surtidorPerfil?.codigo || '-'}
+        </p>
+      </div>
 
-        <select
-          value={sucursalId}
-          onChange={(e) => setSucursalId(e.target.value)}
-          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
-        >
-          <option value="">Selecciona una sucursal</option>
+      {!esMayoreo ? (
+        <label className="block">
+          <span className="mb-2 block text-sm font-bold text-slate-700">
+            Sucursal surtida
+          </span>
 
-          {sucursales.map((sucursal) => (
-            <option key={sucursal.id} value={sucursal.id}>
-              {sucursal.nombre}
-            </option>
-          ))}
-        </select>
-      </label>
+          <select
+            value={sucursalId}
+            onChange={(e) => setSucursalId(e.target.value)}
+            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-red-100"
+          >
+            <option value="">Selecciona una sucursal</option>
+
+            {sucursales.map((sucursal) => (
+              <option key={sucursal.id} value={sucursal.id}>
+                {sucursal.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <StatusMessage type="info">
+          No se selecciona sucursal destino para mayoreo. La producción oficial se cruzará después con el reporte de mayoreo.
+        </StatusMessage>
+      )}
 
       <button
         type="button"
         onClick={onStart}
-        disabled={loading || !sucursalId}
+        disabled={loading || (!esMayoreo && !sucursalId)}
         className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--color-primary)] px-4 py-4 text-base font-black text-white shadow-lg transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? <Loader2 className="animate-spin" size={20} /> : <Play size={20} />}
@@ -219,7 +460,12 @@ function StartSessionView({
 function ActiveSessionView({
   sesion,
   form,
+  negadosDetalle,
+  motivosNegado,
   onChange,
+  onNegadoChange,
+  onAddNegado,
+  onRemoveNegado,
   onSave,
   onFinish,
   onCancel,
@@ -228,19 +474,19 @@ function ActiveSessionView({
   elapsedSeconds,
   lastLocalSave
 }) {
-  const surtidoTotal = getSurtidoTotal(form);
+  const negadosTotal = getNegadosCantidadTotal(negadosDetalle);
+  const surtidoTotal = getSurtidoTotal(form, negadosDetalle);
 
   const metricas = useMemo(() => {
     const horas = elapsedSeconds / 3600;
     const partidasSurtidas = numberOrZero(form.partidas_surtidas);
-    const negados = numberOrZero(form.negados);
 
     return {
       surtidoHora: horas > 0 ? (surtidoTotal / horas).toFixed(2) : '0.00',
       partidasHora: horas > 0 ? (partidasSurtidas / horas).toFixed(2) : '0.00',
-      negadosHora: horas > 0 ? (negados / horas).toFixed(2) : '0.00'
+      negadosHora: horas > 0 ? (negadosTotal / horas).toFixed(2) : '0.00'
     };
-  }, [elapsedSeconds, form, surtidoTotal]);
+  }, [elapsedSeconds, form.partidas_surtidas, surtidoTotal, negadosTotal]);
 
   return (
     <section className="space-y-4">
@@ -251,7 +497,7 @@ function ActiveSessionView({
               Sesión en proceso
             </p>
             <h2 className="mt-1 text-xl font-black">
-              {sesion.sucursal_nombre}
+              {sesion.tipo_operacion === 'MAYOREO' ? 'Mayoreo' : sesion.sucursal_nombre}
             </h2>
           </div>
 
@@ -294,7 +540,7 @@ function ActiveSessionView({
               Captura del proceso
             </h3>
             <p className="text-xs text-slate-500">
-              Surtido total se calcula automático: partidas surtidas + ceros + negados.
+              Surtido total se calcula automático: partidas surtidas + ceros + negados declarados.
             </p>
           </div>
 
@@ -313,7 +559,7 @@ function ActiveSessionView({
             {formatNumber(surtidoTotal)}
           </p>
           <p className="mt-1 text-xs font-semibold text-white/60">
-            {formatNumber(numberOrZero(form.partidas_surtidas))} partidas + {formatNumber(numberOrZero(form.ceros))} ceros + {formatNumber(numberOrZero(form.negados))} negados
+            {formatNumber(numberOrZero(form.partidas_surtidas))} partidas + {formatNumber(numberOrZero(form.ceros))} ceros + {formatNumber(negadosTotal)} negados
           </p>
         </div>
 
@@ -333,10 +579,19 @@ function ActiveSessionView({
           <Field
             label="Negados"
             name="negados"
-            value={form.negados}
+            value={String(negadosTotal)}
             onChange={onChange}
+            readOnly
           />
         </div>
+
+        <NegadosDeclaradosPanel
+          negadosDetalle={negadosDetalle}
+          motivos={motivosNegado}
+          onAdd={onAddNegado}
+          onRemove={onRemoveNegado}
+          onChange={onNegadoChange}
+        />
 
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-bold text-slate-700">
@@ -392,9 +647,12 @@ function ActiveSessionView({
 function SurtidorContent() {
   const [user, setUser] = useState(null);
   const [sucursales, setSucursales] = useState([]);
+  const [surtidorPerfil, setSurtidorPerfil] = useState(null);
   const [sucursalId, setSucursalId] = useState('');
   const [sesion, setSesion] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [negadosDetalle, setNegadosDetalle] = useState([]);
+  const [motivosNegado, setMotivosNegado] = useState(DEFAULT_MOTIVOS_NEGADO);
 
   const [elapsedBase, setElapsedBase] = useState(0);
   const [elapsedExtra, setElapsedExtra] = useState(0);
@@ -424,12 +682,15 @@ function SurtidorContent() {
       const currentUser = getUser();
       setUser(currentUser);
 
-      const [sucursalesRes, activaRes] = await Promise.all([
+      const [sucursalesRes, activaRes, motivosRes] = await Promise.all([
         sucursalesApi.listarActivas(),
-        sesionesApi.obtenerActiva()
+        sesionesApi.obtenerActiva(),
+        negadosApi.motivos().catch(() => ({ motivos: DEFAULT_MOTIVOS_NEGADO }))
       ]);
 
       setSucursales(sucursalesRes.sucursales || []);
+      setSurtidorPerfil(activaRes.surtidor || null);
+      setMotivosNegado(motivosRes.motivos?.length ? motivosRes.motivos : DEFAULT_MOTIVOS_NEGADO);
 
       if (activaRes.sesion) {
         const active = activaRes.sesion;
@@ -443,13 +704,16 @@ function SurtidorContent() {
 
         if (draft) {
           setForm(getFormFromSesionOrDraft(draft));
+          setNegadosDetalle(getNegadosFromSesionOrDraft(draft));
           showMessage('success', 'Se recuperó tu borrador local.');
         } else {
           setForm(getFormFromSesionOrDraft(active));
+          setNegadosDetalle(getNegadosFromSesionOrDraft(active));
         }
       } else {
         setSesion(null);
         setForm(EMPTY_FORM);
+        setNegadosDetalle([]);
         setElapsedBase(0);
         setElapsedExtra(0);
       }
@@ -481,7 +745,11 @@ function SurtidorContent() {
     const timeout = window.setTimeout(async () => {
       try {
         const draftKey = getDraftKeyBySessionId(sesion.id);
-        await saveSessionDraft(draftKey, form);
+        await saveSessionDraft(draftKey, {
+          ...form,
+          negados: getNegadosCantidadTotal(negadosDetalle),
+          negados_detalle: negadosDetalle
+        });
         setLastLocalSave(new Date().toISOString());
       } catch {
         // No bloqueamos captura si IndexedDB falla.
@@ -489,10 +757,12 @@ function SurtidorContent() {
     }, 400);
 
     return () => window.clearTimeout(timeout);
-  }, [form, sesion]);
+  }, [form, negadosDetalle, sesion]);
 
   function handleChange(e) {
     const { name, value } = e.target;
+
+    if (name === 'negados') return;
 
     setForm((prev) => ({
       ...prev,
@@ -500,8 +770,29 @@ function SurtidorContent() {
     }));
   }
 
+  function handleAddNegado() {
+    setNegadosDetalle((prev) => [
+      ...prev,
+      { ...EMPTY_NEGADO }
+    ]);
+  }
+
+  function handleRemoveNegado(index) {
+    setNegadosDetalle((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function handleNegadoChange(index, key, value) {
+    setNegadosDetalle((prev) => prev.map((item, itemIndex) => (
+      itemIndex === index
+        ? { ...item, [key]: value }
+        : item
+    )));
+  }
+
   async function handleStart() {
-    if (!sucursalId) {
+    const esMayoreo = surtidorPerfil?.tipo_operacion === 'MAYOREO';
+
+    if (!esMayoreo && !sucursalId) {
       showMessage('warning', 'Selecciona una sucursal.');
       return;
     }
@@ -509,12 +800,15 @@ function SurtidorContent() {
     try {
       setLoadingAction(true);
 
-      const data = await sesionesApi.iniciar({
-        sucursal_id: Number(sucursalId)
-      });
+      const data = await sesionesApi.iniciar(
+        esMayoreo
+          ? {}
+          : { sucursal_id: Number(sucursalId) }
+      );
 
       setSesion(data.sesion);
       setForm(EMPTY_FORM);
+      setNegadosDetalle([]);
       setElapsedBase(0);
       setElapsedExtra(0);
       setLastLocalSave(null);
@@ -533,7 +827,7 @@ function SurtidorContent() {
     try {
       setSaving(true);
 
-      const payload = buildPayload(form);
+      const payload = buildPayload(form, negadosDetalle);
       const data = await sesionesApi.guardarAvance(sesion.id, payload);
 
       setSesion((prev) => ({
@@ -542,7 +836,11 @@ function SurtidorContent() {
       }));
 
       const draftKey = getDraftKeyBySessionId(sesion.id);
-      await saveSessionDraft(draftKey, form);
+      await saveSessionDraft(draftKey, {
+        ...form,
+        negados: getNegadosCantidadTotal(negadosDetalle),
+        negados_detalle: negadosDetalle
+      });
 
       showMessage('success', 'Avance guardado correctamente.');
     } catch (error) {
@@ -555,7 +853,14 @@ function SurtidorContent() {
   async function handleFinish() {
     if (!sesion) return;
 
-    const payload = buildPayload(form);
+    const validationError = validateNegadosDetalle(negadosDetalle);
+
+    if (validationError) {
+      showMessage('warning', validationError);
+      return;
+    }
+
+    const payload = buildPayload(form, negadosDetalle);
 
     if (payload.surtido_total === 0) {
       const confirmEmpty = window.confirm(
@@ -579,6 +884,7 @@ function SurtidorContent() {
 
       setSesion(null);
       setForm(EMPTY_FORM);
+      setNegadosDetalle([]);
       setSucursalId('');
       setElapsedBase(0);
       setElapsedExtra(0);
@@ -618,6 +924,7 @@ function SurtidorContent() {
 
       setSesion(null);
       setForm(EMPTY_FORM);
+      setNegadosDetalle([]);
       setSucursalId('');
       setElapsedBase(0);
       setElapsedExtra(0);
@@ -663,7 +970,12 @@ function SurtidorContent() {
           <ActiveSessionView
             sesion={sesion}
             form={form}
+            negadosDetalle={negadosDetalle}
+            motivosNegado={motivosNegado}
             onChange={handleChange}
+            onNegadoChange={handleNegadoChange}
+            onAddNegado={handleAddNegado}
+            onRemoveNegado={handleRemoveNegado}
             onSave={handleSave}
             onFinish={handleFinish}
             onCancel={handleCancel}
@@ -682,6 +994,7 @@ function SurtidorContent() {
               sucursales={sucursales}
               sucursalId={sucursalId}
               setSucursalId={setSucursalId}
+              surtidorPerfil={surtidorPerfil}
               onStart={handleStart}
               loading={loadingAction}
             />

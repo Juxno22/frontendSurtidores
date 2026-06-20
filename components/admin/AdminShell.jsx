@@ -16,7 +16,9 @@ import {
   Warehouse,
   Download,
   Activity,
-  UserCheck2,
+  AlertTriangle,
+  PackageSearch,
+  CircleDollarSign,
 } from 'lucide-react';
 import UserAccountMenu from '@/components/UserAccountMenu';
 import AuthGuard from '@/components/AuthGuard';
@@ -43,6 +45,16 @@ const NAV_ADMIN = [
     icon: UsersRound
   },
   {
+    label: 'Mayoreo',
+    href: '/admin/mayoreo',
+    icon: PackageSearch
+  },
+  {
+    label: 'Comisiones',
+    href: '/admin/comisiones',
+    icon: CircleDollarSign
+  },
+  {
     label: 'Exportaciones',
     href: '/admin/exportaciones',
     icon: Download
@@ -51,6 +63,11 @@ const NAV_ADMIN = [
     label: 'Sesiones',
     href: '/admin/sesiones',
     icon: ClipboardList
+  },
+  {
+    label: 'Negados',
+    href: '/admin/negados',
+    icon: AlertTriangle
   },
   {
     label: 'Reporte grupal',
@@ -106,9 +123,24 @@ const NAV_SUPERVISOR = [
     icon: UsersRound
   },
   {
+    label: 'Mayoreo',
+    href: '/supervisor/mayoreo',
+    icon: PackageSearch
+  },
+  {
+    label: 'Comisiones',
+    href: '/supervisor/comisiones',
+    icon: CircleDollarSign
+  },
+  {
     label: 'Sesiones',
     href: '/supervisor/sesiones',
     icon: ClipboardList
+  },
+  {
+    label: 'Negados',
+    href: '/supervisor/negados',
+    icon: AlertTriangle
   },
   {
     label: 'Reporte grupal',
