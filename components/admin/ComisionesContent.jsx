@@ -50,6 +50,7 @@ function tipoLabel(tipo) {
     SURTIDOR_SUCURSAL: 'Surtidor sucursal',
     CHECADOR_SUCURSAL: 'Checador sucursal',
     SURTIDOR_MAYOREO: 'Surtidor mayoreo',
+    OPERATIVO_FUSIONADO: 'Operativo fusionado',
     ENCARGADO: 'Encargado'
   };
 
@@ -415,7 +416,13 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             </span>
                           </td>
                           <td className="px-3 py-4 text-xs font-bold text-slate-600">
-                            {tipo === 'SURTIDOR_MAYOREO' ? (
+                            {tipo === 'OPERATIVO_FUSIONADO' ? (
+                              <>
+                                <p>Funciones: {(item.metricas?.tipos_comision || []).map(tipoLabel).join(' + ')}</p>
+                                <p>Acumulado real: {money(item.metricas?.monto_acumulado_componentes)}</p>
+                                <p>Tope aplicado: {money(item.metricas?.tope_usuario || 2000)}</p>
+                              </>
+                            ) : tipo === 'SURTIDOR_MAYOREO' ? (
                               <>
                                 <p>Partidas netas: {number(item.metricas?.partidas_netas)}</p>
                                 <p>Activo: {formatDurationHHMMSS(item.metricas?.tiempo_activo_segundos)}</p>
