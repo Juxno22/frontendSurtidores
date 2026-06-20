@@ -6,6 +6,7 @@ import {
   Calculator,
   CheckCircle2,
   CircleDollarSign,
+  Download,
   Loader2,
   RefreshCcw,
   Save,
@@ -241,6 +242,7 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
   const [filtros, setFiltros] = useState({ desde: firstDayMonth(), hasta: todayLocal() });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
   const [periodos, setPeriodos] = useState([]);
@@ -285,6 +287,19 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
     }
   }
 
+
+  async function exportarExcel() {
+    try {
+      setError('');
+      setExporting(true);
+      await comisionesApi.exportar(filtros);
+    } catch (err) {
+      setError(err.message || 'No se pudo exportar el Excel.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   useEffect(() => {
     cargarAuxiliares().catch((err) => setError(err.message || 'No se pudo cargar información auxiliar.'));
   }, []);
@@ -309,7 +324,7 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
       <div className="space-y-5">
         <ReportPanel
           title="Periodo de cálculo"
-          subtitle="Primero ejecuta una prueba. Si se ve correcto, guarda el cálculo en BORRADOR."
+          subtitle="Primero ejecuta una prueba. Puedes exportar Excel del periodo con el cálculo vigente."
           right={
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
@@ -320,6 +335,16 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
               >
                 {loading ? <Loader2 className="animate-spin" size={17} /> : <Calculator size={17} />}
                 Probar cálculo
+              </button>
+
+              <button
+                type="button"
+                onClick={exportarExcel}
+                disabled={loading || saving || exporting}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-800 ring-1 ring-slate-200 disabled:opacity-60"
+              >
+                {exporting ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
+                Exportar Excel
               </button>
 
               {role === 'ADMIN' ? (
@@ -433,15 +458,16 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             ) : tipo === 'SURTIDOR_MAYOREO' ? (
                               <>
                                 <p>Partidas netas: {number(item.metricas?.partidas_netas)}</p>
-                                <p>Efectividad: {number(item.metricas?.efectividad_pct)}% · {item.metricas?.cumple_efectividad_minima ? 'cumple' : 'no cumple'}</p>
+                                <p>Efectividad periodo: {number(item.metricas?.efectividad_pct)}%</p>
+                                <p>Días que cumplen: {number(item.metricas?.dias_cumplen_efectividad)} / {number(item.metricas?.dias_evaluados)}</p>
                                 <p>Modo: {item.metricas?.modo_productividad === 'APP_TIEMPO_REAL' ? 'App' : 'Reporte/jornada'}</p>
                                 <p>Partidas/h cálculo: {number(item.metricas?.partidas_netas_por_hora_calculo)}</p>
                               </>
                             ) : tipo === 'CHECADOR_SUCURSAL' ? (
                               <>
                                 <p>TP: {number(item.metricas?.tp)}</p>
-                                <p>Meta: {number(item.metricas?.meta_individual)}</p>
-                                <p>Cumplimiento: {number(item.metricas?.cumplimiento_meta_pct)}%</p>
+                                <p>Meta diaria acumulada: {number(item.metricas?.meta_individual)}</p>
+                                <p>Cumplimiento vs meta: {number(item.metricas?.cumplimiento_meta_pct)}%</p>
                               </>
                             ) : tipo === 'ENCARGADO' ? (
                               <>
@@ -452,7 +478,8 @@ export default function ComisionesContent({ role = 'ADMIN' }) {
                             ) : (
                               <>
                                 <p>Partidas: {number(item.metricas?.partidas_surtidas)}</p>
-                                <p>Efectividad: {number(item.metricas?.efectividad_pct)}% · {item.metricas?.cumple_efectividad_minima ? 'cumple' : 'no cumple'}</p>
+                                <p>Efectividad periodo: {number(item.metricas?.efectividad_pct)}%</p>
+                                <p>Días que cumplen: {number(item.metricas?.dias_cumplen_efectividad)} / {number(item.metricas?.dias_evaluados)}</p>
                                 <p>Negados penalizables: {number(item.metricas?.negados_penalizables)}</p>
                               </>
                             )}
